@@ -1,0 +1,38 @@
+{# Plantilla base. TODO(interfaz): falta el diseño. #}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Logic Detective{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body>
+  <header>
+    <a class="marca" href="{{ url_for('inicio') }}">Logic Detective</a>
+    <nav>
+      <a href="{{ url_for('investigacion') }}">Investigación</a>
+      <a href="{{ url_for('admin') }}">Administración</a>
+    </nav>
+  </header>
+
+  <main>
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+      {% for categoria, mensaje in mensajes %}
+        <p class="aviso {{ categoria }}">{{ mensaje }}</p>
+      {% endfor %}
+    {% endwith %}
+
+    {% if error %}
+      <p class="aviso error">{{ error }}</p>
+    {% endif %}
+
+    {% block contenido %}{% endblock %}
+  </main>
+
+  <footer>
+    Proyecto 1 — Inteligencia Artificial 1 · USAC · Grupo 15 ·
+    motor de inferencia en SWI-Prolog
+  </footer>
+</body>
+</html>

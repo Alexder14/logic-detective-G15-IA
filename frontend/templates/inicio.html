@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block contenido %}
+
+<h1>Logic Detective</h1>
+<p class="proposito">
+  Sistema experto de investigación. Analiza evidencias, declaraciones,
+  coartadas y relaciones para determinar quién es el responsable de un
+  incidente, y justifica la conclusión mostrando las reglas lógicas que se
+  activaron. Toda la deducción la ejecuta un motor de inferencia escrito en
+  SWI-Prolog.
+</p>
+
+<div class="acciones">
+  <a class="boton" href="{{ url_for('investigacion') }}">Iniciar una investigación</a>
+  <a class="boton secundario" href="{{ url_for('admin') }}">Módulo administrativo</a>
+</div>
+
+<h2>Casos de investigación</h2>
+{% if casos %}
+  <table>
+    <thead>
+      <tr><th>Caso</th><th>Dificultad</th><th>Estado</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for caso in casos %}
+        <tr>
+          <td>
+            <strong>{{ caso.titulo }}</strong><br>
+            <small>{{ caso.descripcion }}</small>
+          </td>
+          <td>{{ caso.dificultad }}</td>
+          <td><span class="etiqueta {{ caso.estado }}">{{ caso.estado }}</span></td>
+          <td><a href="{{ url_for('investigar_caso', caso_id=caso.id) }}">Abrir</a></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% elif not error %}
+  <p>No hay casos cargados.</p>
+{% endif %}
+
+{% endblock %}

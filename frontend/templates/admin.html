@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block titulo %}Administración — Logic Detective{% endblock %}
+{% block contenido %}
+
+<h1>Módulo administrativo</h1>
+
+{# TODO(interfaz): el enunciado también pide la bitácora de investigación y el
+   historial de casos resueltos. #}
+
+{% if estado %}
+  <p>
+    Motor Prolog:
+    {% if estado.prolog.disponible %}
+      <span class="etiqueta valida">conectado</span>
+    {% else %}
+      <span class="etiqueta invalida">sin conexión</span>
+      <code>{{ estado.prolog.error }}</code>
+    {% endif %}
+  </p>
+
+  <h2>Avance de los casos</h2>
+  <p>
+    <small>
+      Mínimos por caso según el enunciado:
+      {{ estado.minimos_por_caso.sospechosos }} sospechosos,
+      {{ estado.minimos_por_caso.evidencias }} evidencias,
+      {{ estado.minimos_por_caso.lugares }} lugares,
+      {{ estado.minimos_por_caso.declaraciones }} declaraciones,
+      {{ estado.minimos_por_caso.reglas_de_inferencia }} reglas de inferencia.
+    </small>
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Caso</th><th>Estado</th>
+        <th>Sosp.</th><th>Evid.</th><th>Lug.</th><th>Decl.</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for caso in estado.casos %}
+        <tr>
+          <td>{{ caso.titulo }}<br><small><code>prolog/{{ caso.id }}.pl</code></small></td>
+          <td><span class="etiqueta {{ caso.estado }}">{{ caso.estado }}</span></td>
+          <td>{{ caso.conteos.sospechosos }}/{{ estado.minimos_por_caso.sospechosos }}</td>
+          <td>{{ caso.conteos.evidencias }}/{{ estado.minimos_por_caso.evidencias }}</td>
+          <td>{{ caso.conteos.lugares }}/{{ estado.minimos_por_caso.lugares }}</td>
+          <td>{{ caso.conteos.declaraciones }}/{{ estado.minimos_por_caso.declaraciones }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+
+{% endblock %}

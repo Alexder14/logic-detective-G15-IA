@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block titulo %}Investigación — Logic Detective{% endblock %}
+{% block contenido %}
+
+<h1>Módulo de investigación</h1>
+<p>Elegí un caso para asumir el rol de detective.</p>
+
+{# TODO(interfaz): agregar selección aleatoria y filtro por dificultad
+   (alcance opcional del enunciado). #}
+
+{% if casos %}
+  <ul class="lista-casos">
+    {% for caso in casos %}
+      <li>
+        <a href="{{ url_for('investigar_caso', caso_id=caso.id) }}">{{ caso.titulo }}</a>
+        <span class="etiqueta {{ caso.estado }}">{{ caso.estado }}</span>
+        <small>dificultad: {{ caso.dificultad }}</small>
+        {% if caso.estado == 'pendiente' %}
+          <p class="nota">Este caso todavía no tiene hechos cargados en Prolog.</p>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+{% elif not error %}
+  <p>No hay casos cargados.</p>
+{% endif %}
+
+{% endblock %}

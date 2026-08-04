@@ -1,0 +1,138 @@
+/* Estilos mínimos. TODO(interfaz): falta el diseño antes de la entrega. */
+
+:root {
+  --texto: #1c1c1c;
+  --suave: #666;
+  --borde: #d8d8d8;
+  --fondo: #fafafa;
+  --acento: #1f4e9c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.5;
+  color: var(--texto);
+  background: var(--fondo);
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  background: var(--acento);
+  color: #fff;
+}
+
+header a { color: #fff; text-decoration: none; }
+header .marca { font-weight: 700; font-size: 1.1rem; }
+header nav a { margin-left: 1rem; text-decoration: underline; }
+
+main { max-width: 60rem; margin: 0 auto; padding: 1.5rem; }
+
+footer {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+  color: var(--suave);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--borde);
+}
+
+h1 { margin-top: 0; }
+h2 { margin-top: 2rem; font-size: 1.15rem; }
+
+section {
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: #fff;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+
+.proposito { max-width: 46rem; }
+.nota, small { color: var(--suave); }
+.nota { font-size: 0.9rem; }
+
+code {
+  padding: 0.1rem 0.3rem;
+  background: #f0f0f0;
+  border-radius: 3px;
+  font-size: 0.85rem;
+}
+
+/* Tablas */
+table { width: 100%; border-collapse: collapse; }
+th, td {
+  padding: 0.5rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--borde);
+}
+th { font-size: 0.8rem; text-transform: uppercase; color: var(--suave); }
+
+.acciones { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1.5rem 0; }
+
+.boton {
+  display: inline-block;
+  padding: 0.6rem 1.1rem;
+  background: var(--acento);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 4px;
+}
+.boton.secundario { background: #fff; color: var(--acento); border: 1px solid var(--acento); }
+
+.etiqueta {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 10px;
+  background: #eee;
+  color: #333;
+}
+
+/* Estados de caso */
+.etiqueta.completo  { background: #d7f0d8; }
+.etiqueta.incompleto { background: #fdf0cd; }
+.etiqueta.pendiente { background: #eee; }
+
+/* Coartadas y acusaciones */
+.etiqueta.valida, .etiqueta.correcta { background: #d7f0d8; }
+.etiqueta.invalida, .etiqueta.incorrecta { background: #f8d7da; }
+
+/* Niveles de sospecha */
+.etiqueta.muy_alto { background: #f5c2c7; }
+.etiqueta.alto     { background: #f8d7da; }
+.etiqueta.medio    { background: #fdf0cd; }
+.etiqueta.bajo     { background: #e2e3e5; }
+.etiqueta.nulo     { background: #eee; }
+
+.aviso {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: #fdf0cd;
+  border-left: 4px solid #e0b400;
+  border-radius: 4px;
+}
+.aviso.error, .aviso.incorrecta { background: #f8d7da; border-left-color: #b02a37; }
+.aviso.correcta { background: #d7f0d8; border-left-color: #2f7d32; }
+
+.lista-casos { padding-left: 1.2rem; }
+.lista-casos li { margin-bottom: 0.75rem; }
+
+details summary { cursor: pointer; padding: 0.25rem 0; }
+
+form select, form button { padding: 0.45rem 0.6rem; font-size: 1rem; }
+form button {
+  background: var(--acento);
+  color: #fff;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
