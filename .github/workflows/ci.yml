@@ -1,0 +1,138 @@
+# CI de Logic Detective. Corre en cada push y en los pull requests hacia main y
+# develop. Los cuatro trabajos son independientes y corren en paralelo:
+#
+#   lint    ruff, errores y formato
+#   prolog  compila la base de conocimiento con SWI-Prolog
+#   tests   pytest, que consulta Prolog vía PySwip
+#   docker  construye las imágenes y revisa que el stack responda
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main, develop]
+
+# Si se empuja de nuevo a la misma rama, cancela la corrida anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint de Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar ruff
+        run: pip install ruff==0.8.6
+
+      - name: Errores de lint
+        run: ruff check .
+
+      - name: Formato
+        run: ruff format --check .
+
+  prolog:
+    name: Base de conocimiento
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar SWI-Prolog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends swi-prolog-nox
+
+      # Compila el motor. Si un caso tiene un error de sintaxis falla acá con el
+      # archivo y la línea, más claro que verlo desde pytest.
+      - name: Compilar el motor de inferencia
+        run: swipl -q -g "consult('prolog/logic_detective.pl'), halt" -t "halt(1)"
+
+      # Un error de sintaxis en reglas_base.pl rompe los tres casos a la vez,
+      # porque los tres la incluyen con `:- include`.
+      - name: Compilar reglas_base.pl por separado
+        run: swipl -q -g "consult('prolog/reglas_base.pl'), halt" -t "halt(1)"
+
+      - name: Reportar el avance de cada caso
+        run: |
+          swipl -q -g "
+            consult('prolog/logic_detective.pl'),
+            forall(api_caso(M,_,_,_,_,E,NS,NE,NL,ND),
+                   format('~w: ~w (~w sospechosos, ~w evidencias, ~w lugares, ~w declaraciones)~n',
+                          [M,E,NS,NE,NL,ND])),
+            halt"
+
+  tests:
+    name: Pruebas automatizadas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # PySwip carga libswipl por ffi, así que Prolog tiene que estar instalado
+      # antes que las dependencias de Python.
+      - name: Instalar SWI-Prolog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends swi-prolog-nox
+          swipl --version
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r tests/requirements.txt
+
+      - name: Verificar que PySwip encuentra SWI-Prolog
+        run: |
+          python -c "
+          from pyswip import Prolog
+          p = Prolog()
+          p.consult('prolog/logic_detective.pl')
+          assert list(p.query('X is 2+3'))[0]['X'] == 5
+          print('PySwip responde')
+          "
+
+      - name: pytest
+        run: pytest -v
+
+  docker:
+    name: Contenedores
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construir las imágenes
+        run: docker compose build
+
+      - name: Levantar el stack
+        run: docker compose up -d --wait --wait-timeout 180
+
+      # La interfaz solo puede mostrar al responsable si el backend consultó a
+      # Prolog y le respondió.
+      - name: Verificar el backend
+        run: |
+          curl -fsS http://localhost:8000/health | tee /dev/stderr | grep -q '"prolog":"conectado"'
+
+      - name: Verificar la interfaz
+        run: |
+          curl -fsS http://localhost:8080/ > /dev/null
+          curl -fsS http://localhost:8080/admin > /dev/null
+          curl -fsS http://localhost:8080/investigacion/caso_demo | grep -q "bruno"
+
+      - name: Logs si algo falló
+        if: failure()
+        run: docker compose logs
+
+      - name: Apagar
+        if: always()
+        run: docker compose down -v
