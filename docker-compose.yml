@@ -1,0 +1,63 @@
+# =============================================================================
+#  Logic Detective — orquestación local y de despliegue
+# =============================================================================
+#  Levantar todo desde cero:
+#      docker-compose up --build
+#
+#      Interfaz:          http://localhost:8080
+#      API:               http://localhost:8000
+#      Documentación API: http://localhost:8000/docs
+#
+#  Apagar:
+#      docker-compose down
+#
+#  Los dos servicios se construyen con el contexto en la raíz del repositorio
+#  porque el backend necesita copiar también prolog/.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: logic-detective-backend
+    container_name: logic-detective-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Zona horaria de Guatemala, para que los logs cuadren.
+      TZ: America/Guatemala
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: logic-detective-frontend
+    container_name: logic-detective-frontend
+    ports:
+      - "8080:8080"
+    environment:
+      # Dentro de la red de compose se llega al backend por su nombre de
+      # servicio, no por localhost.
+      BACKEND_URL: http://backend:8000
+      TZ: America/Guatemala
+      # En el despliegue real hay que definir SECRET_KEY con un valor propio.
+      SECRET_KEY: ${SECRET_KEY:-logic-detective-dev}
+    depends_on:
+      # Espera a que el backend esté sano, no solo arrancado, porque cargar la
+      # base de conocimiento toma un momento.
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/salud"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
