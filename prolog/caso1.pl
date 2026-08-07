@@ -135,3 +135,6 @@ caso(caso1,
 %  Documenta cada regla con un comentario de una línea: la rúbrica califica que
 %  el uso de listas, recursividad, unificación, negación y cortes sea
 %  comprobable.
+
+
+
