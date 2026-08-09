@@ -1,38 +1,57 @@
-{# Plantilla base. TODO(interfaz): falta el diseño. #}
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sistema experto de investigación criminal con motor de inferencia en SWI-Prolog.">
   <title>{% block titulo %}Logic Detective{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128269;</text></svg>">
 </head>
 <body>
+  <a class="salto-contenido" href="#contenido">Saltar al contenido</a>
+
   <header>
-    <a class="marca" href="{{ url_for('inicio') }}">Logic Detective</a>
-    <nav>
-      <a href="{{ url_for('investigacion') }}">Investigación</a>
-      <a href="{{ url_for('admin') }}">Administración</a>
-    </nav>
+    <div class="barra">
+      <a class="marca" href="{{ url_for('inicio') }}">
+        <span class="marca-icono" aria-hidden="true">🔍</span>
+        <span>Logic Detective</span>
+      </a>
+      <nav aria-label="Módulos del sistema">
+        {% set en_investigacion = request.endpoint in ['investigacion', 'investigar_caso', 'acusar', 'caso_aleatorio'] %}
+        <a href="{{ url_for('investigacion') }}"
+           class="{{ 'activo' if en_investigacion }}"
+           {% if en_investigacion %}aria-current="page"{% endif %}>Investigación</a>
+        <a href="{{ url_for('admin') }}"
+           class="{{ 'activo' if request.endpoint == 'admin' }}"
+           {% if request.endpoint == 'admin' %}aria-current="page"{% endif %}>Administración</a>
+      </nav>
+    </div>
   </header>
 
-  <main>
+  <main id="contenido">
     {% with mensajes = get_flashed_messages(with_categories=true) %}
       {% for categoria, mensaje in mensajes %}
-        <p class="aviso {{ categoria }}">{{ mensaje }}</p>
+        <p class="aviso {{ categoria }}" role="status">{{ mensaje }}</p>
       {% endfor %}
     {% endwith %}
 
     {% if error %}
-      <p class="aviso error">{{ error }}</p>
+      <p class="aviso error" role="alert">{{ error }}</p>
     {% endif %}
 
     {% block contenido %}{% endblock %}
   </main>
 
   <footer>
-    Proyecto 1 — Inteligencia Artificial 1 · USAC · Grupo 15 ·
-    motor de inferencia en SWI-Prolog
+    <p>
+      <strong>Proyecto 1 — Inteligencia Artificial 1</strong> ·
+      Facultad de Ingeniería, USAC · Grupo 15 · segundo semestre 2026
+    </p>
+    <p class="nota">
+      Toda la deducción la ejecuta un motor de inferencia en SWI-Prolog.
+      Esta interfaz solo consulta y presenta.
+    </p>
   </footer>
 </body>
 </html>
