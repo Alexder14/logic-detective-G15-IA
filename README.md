@@ -154,23 +154,24 @@ Dos ramas fijas y una rama por tarea:
 ```
 main        entregable estable. Solo recibe merges desde develop.
 develop     integración. Aquí se juntan los aportes de todos.
-feat/...    una rama por tarea, sale de develop y vuelve por pull request.
+feature/... una rama por tarea, sale de develop y vuelve por pull request.
 ```
 
-Nombres de rama sugeridos, uno por responsabilidad:
+Una rama por responsabilidad, con el nombre `feature/<carné>-<tema>`:
 
 ```
-feat/caso1        feat/caso2        feat/caso3
-feat/backend      feat/interfaz     docs/manuales
+feature/202100039-caso1-prolog     feature/199622440-caso2-prolog
+feature/201708845-caso3-prolog     feature/201700312-backend
+feature/201020600-interfaz
 ```
 
 **Cómo trabajar tu parte**
 
 ```bash
 git switch develop && git pull
-git switch -c feat/caso1          # tu rama
+git switch -c feature/202100039-caso1-prolog   # tu rama
 # ... trabajás y hacés tus commits ...
-git push -u origin feat/caso1     # abrís el pull request hacia develop
+git push -u origin feature/202100039-caso1-prolog   # y abrís el PR hacia develop
 ```
 
 Trabajá siempre en tu rama, nunca directo en `main`. Como cada caso es un
@@ -213,14 +214,14 @@ Grupo 15. Coordinador: Henrry Omar Martínez Charuc.
 
 | | Carné | Integrante | Rol |
 | --- | --- | --- | --- |
-| P1 | 201708845 | Joshua Estuardo Franco Equite | Prolog — Caso 1 |
-| P2 | 201700312 | Aybson Diddiere Mercado Grijalva | Prolog — Caso 2 |
-| P3 | 202100039 | Madeline Fabiola Prado Reyes | Prolog — Caso 3 |
-| P4 | 9622440 | Henrry Omar Martínez Charuc | Backend Python + integración PySwip. Coordinación |
+| P1 | 202100039 | Madeline Fabiola Prado Reyes | Prolog — Caso 1 |
+| P2 | 199622440 | Henrry Omar Martínez Charuc | Prolog — Caso 2 |
+| P3 | 201708845 | Joshua Estuardo Franco Equite | Prolog — Caso 3 + los 10 casos de prueba |
+| P4 | 201700312 | Aybson Diddiere Mercado Grijalva | Backend Python + integración PySwip |
 | P5 | 201020600 | Pedro Alexander Salazar Pocasangre | Interfaz + Docker/CI-CD/Despliegue |
 
-Los 10 casos de prueba los escribe el dueño de cada caso: tres cada uno, ya
-repartidos en la plantilla de `tests/test_prolog_integracion.py`.
+Los 10 casos de prueba los arma P3, sobre la plantilla de
+`tests/test_prolog_integracion.py`.
 
 El cronograma semana a semana y los porcentajes están en
 [`docs/DISTRIBUCION_TRABAJO.md`](docs/DISTRIBUCION_TRABAJO.md).
