@@ -9,9 +9,9 @@
 
 | | Carné | Nombre | Rol |
 | --- | --- | --- | --- |
-| P1 | 201708845 | Joshua Estuardo Franco Equite | Prolog — Caso 1 (hechos, reglas, consultas) |
+| P1 | 202100039 | Madeline Fabiola Prado Reyes | Prolog — Caso 1 (hechos, reglas, consultas) |
 | P2 | 201700312 | Aybson Diddiere Mercado Grijalva | Prolog — Caso 2 (hechos, reglas, consultas) |
-| P3 | 202100039 | Madeline Fabiola Prado Reyes | Prolog — Caso 3 (hechos, reglas, consultas) |
+| P3 | 201708845 | Joshua Estuardo Franco Equite | Prolog — Caso 3 (hechos, reglas, consultas) |
 | P4 | 9622440 | Henrry Omar Martínez Charuc | Backend Python + integración PySwip. Coordinación |
 | P5 | 201020600 | Pedro Alexander Salazar Pocasangre | Interfaz + Docker/CI-CD/Despliegue |
 
@@ -87,9 +87,9 @@ Los porcentajes deben sumar 100 % y estar respaldados por commits.
 
 | Carné | Nombre | Actividades | Usuario GitHub | % |
 | --- | --- | --- | --- | --- |
-| 201708845 | Joshua Estuardo Franco Equite | Caso 1 en Prolog, sus 3 casos de prueba y su sección del manual técnico | | 20 % |
+| 202100039 | Madeline Fabiola Prado Reyes | Caso 1 en Prolog, sus 3 casos de prueba y su sección del manual técnico | | 20 % |
 | 201700312 | Aybson Diddiere Mercado Grijalva | Caso 2 en Prolog, sus 3 casos de prueba y su sección del manual técnico | | 20 % |
-| 202100039 | Madeline Fabiola Prado Reyes | Caso 3 en Prolog, sus 3 casos de prueba y su sección del manual técnico | | 20 % |
+| 201708845 | Joshua Estuardo Franco Equite | Caso 3 en Prolog, sus 3 casos de prueba y su sección del manual técnico | | 20 % |
 | 9622440 | Henrry Omar Martínez Charuc | Backend: descubrimiento progresivo, bitácora e informe final. Coordinación del grupo e informe de participación | | 20 % |
 | 201020600 | Pedro Alexander Salazar Pocasangre | Estructura del repositorio, reglas base en Prolog, integración con PySwip, interfaz completa, Docker, CI/CD, despliegue y documentación | | 20 % |
 | | | | **TOTAL** | **100 %** |

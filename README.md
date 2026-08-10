@@ -213,9 +213,9 @@ Grupo 15. Coordinador: Henrry Omar Martínez Charuc.
 
 | | Carné | Integrante | Rol |
 | --- | --- | --- | --- |
-| P1 | 201708845 | Joshua Estuardo Franco Equite | Prolog — Caso 1 |
+| P1 | 202100039 | Madeline Fabiola Prado Reyes | Prolog — Caso 1 |
 | P2 | 201700312 | Aybson Diddiere Mercado Grijalva | Prolog — Caso 2 |
-| P3 | 202100039 | Madeline Fabiola Prado Reyes | Prolog — Caso 3 |
+| P3 | 201708845 | Joshua Estuardo Franco Equite | Prolog — Caso 3 |
 | P4 | 9622440 | Henrry Omar Martínez Charuc | Backend Python + integración PySwip. Coordinación |
 | P5 | 201020600 | Pedro Alexander Salazar Pocasangre | Interfaz + Docker/CI-CD/Despliegue |
 
