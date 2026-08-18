@@ -20,11 +20,14 @@ def test_un_caso_inexistente_da_404(cliente):
     assert cliente.get("/api/casos/no_existe").status_code == 404
 
 
-def test_un_caso_vacio_responde_lista_vacia(cliente):
-    """El caso todavía no tiene hechos, así que no es un error."""
+def test_los_sospechosos_traen_nivel_puntaje_e_indicios(cliente):
+    """Un caso ya poblado devuelve su ranking con la forma que espera la interfaz."""
     respuesta = cliente.get("/api/casos/caso1/sospechosos")
     assert respuesta.status_code == 200
-    assert respuesta.json() == []
+    sospechosos = respuesta.json()
+    assert sospechosos, "caso1 ya tiene hechos: el ranking no puede venir vacío"
+    for sospechoso in sospechosos:
+        assert {"persona", "nivel_sospecha", "puntaje", "indicios"} <= set(sospechoso)
 
 
 def test_sospechosos_vienen_ordenados_por_puntaje(cliente):
