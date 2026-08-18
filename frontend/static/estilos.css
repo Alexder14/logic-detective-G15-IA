@@ -1,138 +1,514 @@
-/* Estilos mínimos. TODO(interfaz): falta el diseño antes de la entrega. */
+/* Logic Detective — hoja de estilos de la interfaz.
+ *
+ * Un solo archivo y sin dependencias externas: el despliegue no debe pedirle
+ * nada a un CDN. Todo el color sale de las variables de :root, así que cambiar
+ * el tema es cambiar ese bloque y nada más.
+ *
+ * Orden: tokens, base, estructura, componentes, responsive, impresión.
+ */
+
+/* ------------------------------------------------------------------ tokens */
 
 :root {
-  --texto: #1c1c1c;
-  --suave: #666;
-  --borde: #d8d8d8;
-  --fondo: #fafafa;
+  color-scheme: light dark;
+
+  --fondo: #f2f0ec;
+  --superficie: #ffffff;
+  --superficie-2: #f7f5f2;
+  --texto: #1b1d21;
+  --suave: #5f6570;
+  --borde: #dedad2;
+  --borde-fuerte: #c6c1b6;
+
   --acento: #1f4e9c;
+  --acento-claro: #e8eef8;
+  --acento-oscuro: #163a75;
+
+  --tinta: #232830;          /* encabezado y pie: el azul de carpeta de caso */
+  --ok: #2f7d32;
+  --ok-fondo: #e2f2e3;
+  --alerta: #b02a37;
+  --alerta-fondo: #fae3e5;
+  --aviso: #a37200;
+  --aviso-fondo: #fbf1d8;
+
+  --sombra: 0 1px 2px rgb(24 22 18 / 6%), 0 4px 12px rgb(24 22 18 / 5%);
+  --radio: 8px;
+  --radio-chico: 4px;
+  --ancho: 64rem;
+
+  --serif: ui-serif, Georgia, "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace;
 }
 
-* { box-sizing: border-box; }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #16181c;
+    --superficie: #1e2127;
+    --superficie-2: #24282f;
+    --texto: #e8e6e3;
+    --suave: #a0a6b0;
+    --borde: #333841;
+    --borde-fuerte: #454b56;
+
+    --acento: #7aa7e8;
+    --acento-claro: #23303f;
+    --acento-oscuro: #a8c5f0;
+
+    --tinta: #12141a;
+    --ok: #7cc47f;
+    --ok-fondo: #1e2f20;
+    --alerta: #ef8a94;
+    --alerta-fondo: #35211f;
+    --aviso: #e0b95a;
+    --aviso-fondo: #322a16;
+
+    --sombra: 0 1px 2px rgb(0 0 0 / 30%), 0 4px 12px rgb(0 0 0 / 25%);
+  }
+}
+
+/* -------------------------------------------------------------------- base */
+
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  line-height: 1.5;
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
   color: var(--texto);
   background: var(--fondo);
+  -webkit-font-smoothing: antialiased;
 }
 
-header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.5rem;
+h1, h2, h3 {
+  font-family: var(--serif);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+h1 { margin: 0 0 0.5rem; font-size: 1.9rem; }
+h2 { margin: 2rem 0 0.75rem; font-size: 1.25rem; }
+h3 { margin: 1.25rem 0 0.5rem; font-size: 1.05rem; }
+
+p { margin: 0 0 1rem; }
+
+a { color: var(--acento); }
+a:hover { color: var(--acento-oscuro); }
+
+:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+  border-radius: var(--radio-chico);
+}
+
+code {
+  padding: 0.1rem 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.85em;
+  color: var(--texto);
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+  overflow-wrap: anywhere;
+}
+
+small, .nota { color: var(--suave); }
+.nota { font-size: 0.9rem; }
+.proposito { max-width: 46rem; color: var(--suave); }
+
+/* Enlace de salto: invisible hasta que se llega por teclado. */
+.salto-contenido {
+  position: absolute;
+  left: -9999px;
+  padding: 0.6rem 1rem;
+  color: #fff;
   background: var(--acento);
+  border-radius: 0 0 var(--radio) 0;
+}
+.salto-contenido:focus {
+  left: 0;
+  top: 0;
+  z-index: 10;
   color: #fff;
 }
 
-header a { color: #fff; text-decoration: none; }
-header .marca { font-weight: 700; font-size: 1.1rem; }
-header nav a { margin-left: 1rem; text-decoration: underline; }
+/* -------------------------------------------------------------- estructura */
 
-main { max-width: 60rem; margin: 0 auto; padding: 1.5rem; }
+header {
+  background: var(--tinta);
+  border-bottom: 3px solid var(--acento);
+}
+
+header .barra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  max-width: var(--ancho);
+  margin: 0 auto;
+  padding: 0.85rem 1.5rem;
+}
+
+header a { color: #f4f2ee; text-decoration: none; }
+
+header .marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+header .marca-icono { font-size: 1.1rem; }
+
+header nav { display: flex; gap: 0.35rem; }
+
+header nav a {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.95rem;
+  border-radius: var(--radio-chico);
+  border: 1px solid transparent;
+}
+header nav a:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 10%);
+}
+header nav a.activo {
+  color: #fff;
+  background: rgb(255 255 255 / 14%);
+  border-color: rgb(255 255 255 / 22%);
+}
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--ancho);
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
 
 footer {
-  max-width: 60rem;
+  max-width: var(--ancho);
   margin: 0 auto;
   padding: 1.5rem;
-  color: var(--suave);
   font-size: 0.85rem;
+  color: var(--suave);
   border-top: 1px solid var(--borde);
 }
+footer p { margin: 0 0 0.25rem; }
 
-h1 { margin-top: 0; }
-h2 { margin-top: 2rem; font-size: 1.15rem; }
+/* -------------------------------------------------------------- componentes */
 
+/* Secciones: cada bloque de información del caso es una ficha. */
 section {
-  padding: 1rem;
-  margin-bottom: 1rem;
-  background: #fff;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+  background: var(--superficie);
   border: 1px solid var(--borde);
-  border-radius: 6px;
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
 }
+section > h2:first-child { margin-top: 0; }
+section > :last-child { margin-bottom: 0; }
 
-.proposito { max-width: 46rem; }
-.nota, small { color: var(--suave); }
-.nota { font-size: 0.9rem; }
-
-code {
-  padding: 0.1rem 0.3rem;
-  background: #f0f0f0;
-  border-radius: 3px;
-  font-size: 0.85rem;
-}
+section ul { margin: 0; padding-left: 1.25rem; }
+section li { margin-bottom: 0.4rem; }
 
 /* Tablas */
-table { width: 100%; border-collapse: collapse; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
 th, td {
-  padding: 0.5rem;
+  padding: 0.6rem 0.5rem;
   text-align: left;
   vertical-align: top;
   border-bottom: 1px solid var(--borde);
 }
-th { font-size: 0.8rem; text-transform: uppercase; color: var(--suave); }
+th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--suave);
+  border-bottom: 2px solid var(--borde-fuerte);
+}
+tbody tr:hover { background: var(--superficie-2); }
+tbody tr:last-child td { border-bottom: 0; }
 
+/* Botones */
 .acciones { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1.5rem 0; }
 
 .boton {
   display: inline-block;
-  padding: 0.6rem 1.1rem;
-  background: var(--acento);
+  padding: 0.6rem 1.15rem;
+  font-size: 0.95rem;
+  font-weight: 500;
   color: #fff;
   text-decoration: none;
-  border-radius: 4px;
+  background: var(--acento);
+  border: 1px solid var(--acento);
+  border-radius: var(--radio-chico);
+  cursor: pointer;
 }
-.boton.secundario { background: #fff; color: var(--acento); border: 1px solid var(--acento); }
+.boton:hover {
+  color: #fff;
+  background: var(--acento-oscuro);
+  border-color: var(--acento-oscuro);
+}
+.boton.secundario {
+  color: var(--acento);
+  background: var(--superficie);
+}
+.boton.secundario:hover {
+  color: var(--acento);
+  background: var(--acento-claro);
+  border-color: var(--acento);
+}
 
+/* Etiquetas de estado */
 .etiqueta {
   display: inline-block;
-  padding: 0.1rem 0.5rem;
+  padding: 0.15rem 0.6rem;
   font-size: 0.75rem;
-  border-radius: 10px;
-  background: #eee;
-  color: #333;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--texto);
+  background: var(--superficie-2);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: 999px;
 }
 
 /* Estados de caso */
-.etiqueta.completo  { background: #d7f0d8; }
-.etiqueta.incompleto { background: #fdf0cd; }
-.etiqueta.pendiente { background: #eee; }
+.etiqueta.completo   { color: var(--ok);     background: var(--ok-fondo);     border-color: var(--ok); }
+.etiqueta.incompleto { color: var(--aviso);  background: var(--aviso-fondo);  border-color: var(--aviso); }
+.etiqueta.pendiente  { color: var(--suave);  background: var(--superficie-2); border-color: var(--borde-fuerte); }
 
-/* Coartadas y acusaciones */
-.etiqueta.valida, .etiqueta.correcta { background: #d7f0d8; }
-.etiqueta.invalida, .etiqueta.incorrecta { background: #f8d7da; }
+/* Coartadas y veredictos de acusación */
+.etiqueta.valida,   .etiqueta.correcta   { color: var(--ok);     background: var(--ok-fondo);     border-color: var(--ok); }
+.etiqueta.invalida, .etiqueta.incorrecta { color: var(--alerta); background: var(--alerta-fondo); border-color: var(--alerta); }
 
-/* Niveles de sospecha */
-.etiqueta.muy_alto { background: #f5c2c7; }
-.etiqueta.alto     { background: #f8d7da; }
-.etiqueta.medio    { background: #fdf0cd; }
-.etiqueta.bajo     { background: #e2e3e5; }
-.etiqueta.nulo     { background: #eee; }
+/* Niveles de sospecha: de más grave a menos. */
+.etiqueta.muy_alto { color: #fff; background: var(--alerta); border-color: var(--alerta); }
+.etiqueta.alto     { color: var(--alerta); background: var(--alerta-fondo); border-color: var(--alerta); }
+.etiqueta.medio    { color: var(--aviso);  background: var(--aviso-fondo);  border-color: var(--aviso); }
+.etiqueta.bajo     { color: var(--suave);  background: var(--superficie-2); border-color: var(--borde-fuerte); }
+.etiqueta.nulo     { color: var(--suave);  background: transparent;         border-color: var(--borde); }
 
+/* Avisos */
 .aviso {
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-  background: #fdf0cd;
-  border-left: 4px solid #e0b400;
-  border-radius: 4px;
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.95rem;
+  background: var(--aviso-fondo);
+  border: 1px solid var(--borde);
+  border-left: 4px solid var(--aviso);
+  border-radius: var(--radio-chico);
 }
-.aviso.error, .aviso.incorrecta { background: #f8d7da; border-left-color: #b02a37; }
-.aviso.correcta { background: #d7f0d8; border-left-color: #2f7d32; }
+.aviso.error, .aviso.incorrecta {
+  background: var(--alerta-fondo);
+  border-left-color: var(--alerta);
+}
+.aviso.correcta {
+  background: var(--ok-fondo);
+  border-left-color: var(--ok);
+}
 
-.lista-casos { padding-left: 1.2rem; }
-.lista-casos li { margin-bottom: 0.75rem; }
+/* Filtros del listado de casos */
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+.filtro-grupo { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.filtro-azar { margin-left: auto; }
 
-details summary { cursor: pointer; padding: 0.25rem 0; }
+.filtro-titulo {
+  margin-right: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--suave);
+}
 
-form select, form button { padding: 0.45rem 0.6rem; font-size: 1rem; }
-form button {
-  background: var(--acento);
-  color: #fff;
-  border: 0;
-  border-radius: 4px;
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.88rem;
+  color: var(--texto);
+  text-decoration: none;
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+}
+.chip:hover { color: var(--texto); border-color: var(--borde-fuerte); }
+.chip.activo {
+  color: var(--acento-oscuro);
+  background: var(--acento-claro);
+  border-color: var(--acento);
+  font-weight: 600;
+}
+.chip-n {
+  padding: 0 0.35rem;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--suave);
+  background: var(--superficie);
+  border-radius: 999px;
+}
+.chip.activo .chip-n { color: var(--acento-oscuro); }
+
+.resumen-filtro { margin-bottom: 1rem; }
+
+/* Listado de casos */
+.lista-casos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+  gap: 1rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.tarjeta-caso {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+}
+
+.tarjeta-cabecera {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.tarjeta-cabecera h2 { margin: 0; font-size: 1.15rem; }
+.tarjeta-cabecera a { text-decoration: none; }
+.tarjeta-cabecera a:hover { text-decoration: underline; }
+
+.tarjeta-descripcion {
+  margin: 0;
+  font-size: 0.93rem;
+  color: var(--suave);
+}
+
+.tarjeta-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--suave);
+}
+
+.dificultad {
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.dificultad.facil   { color: var(--ok); }
+.dificultad.media   { color: var(--aviso); }
+.dificultad.dificil { color: var(--alerta); }
+
+.tarjeta-caso .boton { margin-top: auto; align-self: flex-start; }
+.tarjeta-caso .nota { margin: auto 0 0; }
+
+.vacio {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--suave);
+  background: var(--superficie);
+  border: 1px dashed var(--borde-fuerte);
+  border-radius: var(--radio);
+}
+
+/* Explicación de la conclusión: cada regla activada se abre aparte. */
+details {
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+}
+details summary {
   cursor: pointer;
+  font-weight: 500;
+  padding: 0.15rem 0;
+}
+details[open] summary {
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--borde);
+}
+
+/* Formularios */
+form select, form button, form input {
+  padding: 0.5rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio-chico);
+}
+form button {
+  color: #fff;
+  background: var(--acento);
+  border-color: var(--acento);
+  font-weight: 500;
+  cursor: pointer;
+}
+form button:hover { background: var(--acento-oscuro); border-color: var(--acento-oscuro); }
+
+/* ------------------------------------------------------------- responsive */
+
+@media (max-width: 40rem) {
+  main { padding: 1.5rem 1rem 2.5rem; }
+  header .barra { padding: 0.75rem 1rem; }
+  h1 { font-size: 1.5rem; }
+  section { padding: 1rem; }
+  .filtro-azar { margin-left: 0; }
+  .lista-casos { grid-template-columns: 1fr; }
+
+  /* Tablas anchas: que hagan scroll en vez de romper el ancho de la página. */
+  table { display: block; overflow-x: auto; white-space: nowrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* ------------------------------------------------------------- impresión */
+/* Para las capturas del manual de usuario y el informe final del caso. */
+
+@media print {
+  header nav, .filtros, .acciones, .salto-contenido { display: none; }
+  body { background: #fff; color: #000; }
+  section, .tarjeta-caso { box-shadow: none; border-color: #999; break-inside: avoid; }
+  details { break-inside: avoid; }
+  details[open] > summary ~ * { display: block; }
 }

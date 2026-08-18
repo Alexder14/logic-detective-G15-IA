@@ -3,26 +3,104 @@
 {% block contenido %}
 
 <h1>Módulo de investigación</h1>
-<p>Elegí un caso para asumir el rol de detective.</p>
+<p class="proposito">
+  Elegí un caso para asumir el rol de detective. Vas a poder examinar la
+  escena, interrogar a los sospechosos y acusar a quien creas responsable; el
+  motor de inferencia te dirá si tu deducción coincide con la suya y por qué.
+</p>
 
-{# TODO(interfaz): agregar selección aleatoria y filtro por dificultad
-   (alcance opcional del enunciado). #}
+<div class="filtros">
+  <div class="filtro-grupo">
+    <span class="filtro-titulo">Dificultad</span>
+    <a class="chip {{ 'activo' if not dificultad }}"
+       href="{{ url_for('investigacion', estado=estado or none) }}">
+      Todas <span class="chip-n">{{ total }}</span>
+    </a>
+    {% for valor in dificultades %}
+      <a class="chip {{ 'activo' if dificultad == valor }}"
+         href="{{ url_for('investigacion', dificultad=valor, estado=estado or none) }}">
+        {{ etiquetas_dificultad[valor] }}
+        <span class="chip-n">{{ conteos_dificultad[valor] }}</span>
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="filtro-grupo">
+    <span class="filtro-titulo">Estado</span>
+    <a class="chip {{ 'activo' if not estado }}"
+       href="{{ url_for('investigacion', dificultad=dificultad or none) }}">
+      Todos
+    </a>
+    {% for valor in estados %}
+      <a class="chip {{ 'activo' if estado == valor }}"
+         href="{{ url_for('investigacion', dificultad=dificultad or none, estado=valor) }}">
+        {{ etiquetas_estado[valor] }}
+        <span class="chip-n">{{ conteos_estado[valor] }}</span>
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="filtro-grupo filtro-azar">
+    <a class="boton secundario"
+       href="{{ url_for('caso_aleatorio', dificultad=dificultad or none, estado=estado or none) }}">
+      🎲 Caso al azar
+    </a>
+  </div>
+</div>
 
 {% if casos %}
+  <p class="nota resumen-filtro">
+    {{ casos | length }} de {{ total }}
+    {{ 'caso' if total == 1 else 'casos' }}
+    {% if dificultad or estado %}
+      · <a href="{{ url_for('investigacion') }}">quitar filtros</a>
+    {% endif %}
+  </p>
+
   <ul class="lista-casos">
     {% for caso in casos %}
-      <li>
-        <a href="{{ url_for('investigar_caso', caso_id=caso.id) }}">{{ caso.titulo }}</a>
-        <span class="etiqueta {{ caso.estado }}">{{ caso.estado }}</span>
-        <small>dificultad: {{ caso.dificultad }}</small>
+      <li class="tarjeta-caso">
+        <div class="tarjeta-cabecera">
+          <h2>
+            <a href="{{ url_for('investigar_caso', caso_id=caso.id) }}">{{ caso.titulo }}</a>
+          </h2>
+          <span class="etiqueta {{ caso.estado }}">{{ caso.estado }}</span>
+        </div>
+
+        <p class="tarjeta-descripcion">{{ caso.descripcion }}</p>
+
+        <p class="tarjeta-meta">
+          <span class="dificultad {{ caso.dificultad }}">
+            {{ etiquetas_dificultad.get(caso.dificultad, caso.dificultad) }}
+          </span>
+          <span>{{ caso.conteos.sospechosos }} sospechosos</span>
+          <span>{{ caso.conteos.evidencias }} evidencias</span>
+          <span>{{ caso.conteos.lugares }} lugares</span>
+          <span>{{ caso.conteos.declaraciones }} declaraciones</span>
+        </p>
+
         {% if caso.estado == 'pendiente' %}
-          <p class="nota">Este caso todavía no tiene hechos cargados en Prolog.</p>
+          <p class="nota">
+            Este caso todavía no tiene hechos cargados en
+            <code>prolog/{{ caso.id }}.pl</code>.
+          </p>
+        {% else %}
+          <a class="boton" href="{{ url_for('investigar_caso', caso_id=caso.id) }}">
+            Investigar
+          </a>
         {% endif %}
       </li>
     {% endfor %}
   </ul>
 {% elif not error %}
-  <p>No hay casos cargados.</p>
+  <p class="vacio">
+    {% if dificultad or estado %}
+      Ningún caso coincide con el filtro.
+      <a href="{{ url_for('investigacion') }}">Ver todos los casos</a>.
+    {% else %}
+      No hay casos cargados.
+    {% endif %}
+  </p>
 {% endif %}
 
 {% endblock %}

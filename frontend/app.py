@@ -15,6 +15,7 @@ Levantar en desarrollo:
 from __future__ import annotations
 
 import os
+import random
 from typing import Any
 
 import requests
@@ -69,6 +70,52 @@ def api_opcional(ruta: str, por_defecto: Any) -> Any:
 
 
 # --------------------------------------------------------------------------
+# Filtros del listado de casos
+# --------------------------------------------------------------------------
+#
+# El filtro se resuelve acá, sobre la lista que ya devolvió el backend. No es
+# inferencia, es presentación: decide qué filas se dibujan, no qué es verdad.
+# Cuando el backend acepte ?dificultad= y ?estado= en /api/casos (está como
+# TODO(backend) en main.py) esto se cambia por pasarle los parámetros y borrar
+# filtrar_casos().
+
+DIFICULTADES = ("facil", "media", "dificil")
+ESTADOS = ("completo", "incompleto", "pendiente")
+
+ETIQUETAS_DIFICULTAD = {"facil": "Fácil", "media": "Media", "dificil": "Difícil"}
+ETIQUETAS_ESTADO = {
+    "completo": "Completo",
+    "incompleto": "Incompleto",
+    "pendiente": "Pendiente",
+}
+
+
+def opcion(valor: str | None, permitidos: tuple[str, ...]) -> str:
+    """Normaliza un parámetro de la URL. Devuelve "" si no es uno esperado."""
+    valor = (valor or "").strip().lower()
+    return valor if valor in permitidos else ""
+
+
+def filtrar_casos(
+    casos: list[dict[str, Any]], dificultad: str, estado: str
+) -> list[dict[str, Any]]:
+    """Aplica los filtros activos. Un filtro vacío no descarta nada."""
+    return [
+        caso
+        for caso in casos
+        if (not dificultad or caso.get("dificultad") == dificultad)
+        and (not estado or caso.get("estado") == estado)
+    ]
+
+
+def contar_por(
+    casos: list[dict[str, Any]], campo: str, valores: tuple[str, ...]
+) -> dict[str, int]:
+    """Cuántos casos hay de cada valor, para el contador de cada filtro."""
+    return {v: sum(1 for caso in casos if caso.get(campo) == v) for v in valores}
+
+
+# --------------------------------------------------------------------------
 # Inicio
 # --------------------------------------------------------------------------
 
@@ -91,13 +138,62 @@ def inicio():
 
 @app.route("/investigacion")
 def investigacion():
-    """Listado de casos para iniciar una investigación."""
+    """Listado de casos para iniciar una investigación.
+
+    Acepta ?dificultad=facil|media|dificil y ?estado=completo|incompleto|
+    pendiente. Un valor que no exista se ignora en lugar de dar error: la URL
+    la puede escribir el usuario a mano.
+    """
+    dificultad = opcion(request.args.get("dificultad"), DIFICULTADES)
+    estado = opcion(request.args.get("estado"), ESTADOS)
     try:
         casos = api("/api/casos")
         error = None
     except ErrorBackend as exc:
         casos, error = [], str(exc)
-    return render_template("investigacion.html", casos=casos, error=error)
+    return render_template(
+        "investigacion.html",
+        casos=filtrar_casos(casos, dificultad, estado),
+        total=len(casos),
+        dificultad=dificultad,
+        estado=estado,
+        dificultades=DIFICULTADES,
+        estados=ESTADOS,
+        etiquetas_dificultad=ETIQUETAS_DIFICULTAD,
+        etiquetas_estado=ETIQUETAS_ESTADO,
+        conteos_dificultad=contar_por(casos, "dificultad", DIFICULTADES),
+        conteos_estado=contar_por(casos, "estado", ESTADOS),
+        error=error,
+    )
+
+
+@app.route("/investigacion/aleatorio")
+def caso_aleatorio():
+    """Abre un caso al azar, respetando los filtros activos.
+
+    Solo entran al sorteo los casos que ya tienen hechos cargados en Prolog:
+    mandar al usuario a un caso 'pendiente' es mandarlo a una página vacía.
+    """
+    dificultad = opcion(request.args.get("dificultad"), DIFICULTADES)
+    estado = opcion(request.args.get("estado"), ESTADOS)
+    volver = url_for(
+        "investigacion", dificultad=dificultad or None, estado=estado or None
+    )
+    try:
+        casos = api("/api/casos")
+    except ErrorBackend as exc:
+        flash(f"No se pudo obtener la lista de casos. {exc}", "error")
+        return redirect(volver)
+
+    candidatos = [
+        caso
+        for caso in filtrar_casos(casos, dificultad, estado)
+        if caso.get("estado") != "pendiente"
+    ]
+    if not candidatos:
+        flash("No hay casos con datos cargados que coincidan con el filtro.", "error")
+        return redirect(volver)
+    return redirect(url_for("investigar_caso", caso_id=random.choice(candidatos)["id"]))
 
 
 @app.route("/investigacion/<caso_id>")

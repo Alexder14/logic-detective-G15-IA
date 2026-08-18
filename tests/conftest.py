@@ -47,3 +47,30 @@ def cliente(motor):
 def casos_cargados(motor) -> list[str]:
     """Identificadores de los casos registrados en caso_modulo/1."""
     return [fila["M"] for fila in motor.filas("caso_modulo(M)")]
+
+
+@pytest.fixture(scope="session")
+def interfaz():
+    """Módulo de la interfaz Flask (`frontend/app.py`).
+
+    Se carga por ruta y bajo otro nombre porque `frontend/app.py` y el paquete
+    `backend/app/` competirían por el nombre `app` en sys.modules.
+    """
+    import importlib.util
+
+    ruta = RAIZ / "frontend" / "app.py"
+    spec = importlib.util.spec_from_file_location("interfaz_web", ruta)
+    modulo = importlib.util.module_from_spec(spec)
+    # Tiene que estar en sys.modules *antes* de ejecutarlo: Flask deduce de ahí
+    # la carpeta de plantillas, y sin esto las busca desde el directorio actual.
+    sys.modules["interfaz_web"] = modulo
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
+@pytest.fixture
+def navegador(interfaz):
+    """Cliente HTTP contra la interfaz, sin levantar un servidor."""
+    interfaz.app.config["TESTING"] = True
+    with interfaz.app.test_client() as cliente_web:
+        yield cliente_web
