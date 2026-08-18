@@ -43,13 +43,14 @@ def test_las_reglas_base_se_cargan_solas(motor):
     assert filas, "reglas_base.pl no se cargó dentro del módulo del caso"
 
 
-def test_un_caso_vacio_falla_sin_lanzar_excepcion(motor):
-    """Un caso sin hechos debe fallar limpio, no explotar.
+def test_una_meta_sin_soluciones_falla_sin_lanzar_excepcion(motor):
+    """Una meta que no tiene respuesta debe fallar limpio, no explotar.
 
-    Es lo que deja a la API en pie mientras caso1/2/3 están vacíos.
+    Es lo que deja a la API en pie cuando la interfaz consulta por alguien que
+    no figura en el caso.
     """
-    assert motor.filas("caso1:responsable(P)") == []
-    assert motor.filas("caso1:sospechoso(P)") == []
+    assert motor.filas("caso1:sospechoso(nadie)") == []
+    assert motor.filas("caso1:responsable(nadie)") == []
 
 
 def test_los_modulos_de_caso_estan_aislados(motor):
