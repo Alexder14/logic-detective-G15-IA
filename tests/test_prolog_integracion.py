@@ -179,24 +179,9 @@ CASOS_DE_PRUEBA = [
         [{"E": "CAMBIAR"}],
         marks=pytest.mark.skip(reason="pendiente: caso2 sin hechos"),
     ),
-    pytest.param(
-        "caso3",
-        "responsable(P)",
-        [{"P": "CAMBIAR"}],
-        marks=pytest.mark.skip(reason="pendiente: caso3 sin hechos"),
-    ),
-    pytest.param(
-        "caso3",
-        "tuvo_oportunidad(CAMBIAR, L)",
-        [{"L": "CAMBIAR"}],
-        marks=pytest.mark.skip(reason="pendiente: caso3 sin hechos"),
-    ),
-    pytest.param(
-        "caso3",
-        "informacion_falsa(P)",
-        [{"P": "CAMBIAR"}],
-        marks=pytest.mark.skip(reason="pendiente: caso3 sin hechos"),
-    ),
+    ("caso3", "responsable(P)", [{"P": "diego_lira"}]),
+    ("caso3", "tuvo_oportunidad(diego_lira, L)", [{"L": "sala_servidores"}]),
+    ("caso3", "informacion_falsa(P)", [{"P": "diego_lira"}]),
 ]
 
 
@@ -207,12 +192,7 @@ def test_caso_de_prueba(motor, caso, meta, esperado):
 
 
 def test_los_tres_casos_cumplen_los_minimos(motor):
-    """Los tres casos deben alcanzar los mínimos del enunciado.
-
-    Quitar el skip cuando estén cargados.
-    """
-    pytest.skip("activar cuando los tres casos estén cargados")
-
+    """Los tres casos deben alcanzar los mínimos del enunciado."""
     for caso in ("caso1", "caso2", "caso3"):
         filas = motor.filas(f"estado_caso({caso}, Estado, _)")
         assert filas[0]["Estado"] == "completo", f"{caso} no cumple los mínimos"
