@@ -102,6 +102,16 @@ def exigir_caso(caso_id: str) -> str:
     return caso
 
 
+def casos_de_ejemplo() -> set[str]:
+    """Casos de referencia, que no cuentan entre los tres entregables.
+
+    No tienen que alcanzar los mínimos, así que `estado_caso/3` los reporta
+    incompletos. La interfaz necesita saberlo para no presentarlos como trabajo
+    a medio hacer en el módulo administrativo.
+    """
+    return {fila["M"] for fila in consultar("api_caso_de_ejemplo(M)")}
+
+
 def exigir_investigacion(caso_id: str, investigacion_id: str) -> Investigacion:
     """Valida que la investigación exista y pertenezca a este caso."""
     investigacion = almacen.obtener(investigacion_id)
@@ -165,6 +175,7 @@ async def listar_casos(
     filas = consultar(
         "api_caso(M, Id, Titulo, Descripcion, Dificultad, Estado, NS, NE, NL, ND)"
     )
+    ejemplos = casos_de_ejemplo()
     if dificultad is not None:
         filas = [f for f in filas if f["Dificultad"] == dificultad]
     if estado is not None:
@@ -177,6 +188,7 @@ async def listar_casos(
             "descripcion": fila["Descripcion"],
             "dificultad": fila["Dificultad"],
             "estado": fila["Estado"],
+            "es_ejemplo": fila["Id"] in ejemplos,
             "conteos": {
                 "sospechosos": fila["NS"],
                 "evidencias": fila["NE"],
@@ -204,6 +216,7 @@ async def obtener_caso(caso_id: str) -> dict[str, Any]:
         "descripcion": fila["Descripcion"],
         "dificultad": fila["Dificultad"],
         "estado": fila["Estado"],
+        "es_ejemplo": fila["Id"] in casos_de_ejemplo(),
         "conteos": {
             "sospechosos": fila["NS"],
             "evidencias": fila["NE"],
@@ -511,6 +524,51 @@ async def listar_motivos(
     ]
 
 
+@app.get("/api/casos/{caso_id}/relaciones", tags=["investigación"])
+async def listar_relaciones(
+    caso_id: str, investigacion_id: Optional[str] = None
+) -> list[dict[str, Any]]:
+    """Vínculos entre las personas involucradas.
+
+    `es_conflictiva` marca las relaciones que el motor usa para deducir un
+    motivo cuando no está declarado (ex_pareja, deudor, rival, heredero).
+    """
+    caso_id = exigir_caso(caso_id)
+    if investigacion_id is not None:
+        investigacion = exigir_investigacion(caso_id, investigacion_id)
+        investigacion.registrar(
+            "consultar", "consultó las relaciones entre las personas"
+        )
+    return [
+        {
+            "persona": fila["Persona"],
+            "con_quien": fila["ConQuien"],
+            "tipo": fila["Tipo"],
+            "es_conflictiva": fila["Conflictiva"] == "si",
+            "es_con_la_victima": fila["Victima"] == "si",
+        }
+        for fila in consultar(
+            f"api_relacion({caso_id}, Persona, ConQuien, Tipo, Conflictiva, Victima)"
+        )
+    ]
+
+
+@app.get("/api/casos/{caso_id}/oportunidades", tags=["investigación"])
+async def listar_oportunidades(
+    caso_id: str, investigacion_id: Optional[str] = None
+) -> list[dict[str, Any]]:
+    """Quiénes pudieron cometer el incidente: estuvieron o pudieron estar en la
+    escena y no tienen una coartada que los descarte."""
+    caso_id = exigir_caso(caso_id)
+    if investigacion_id is not None:
+        investigacion = exigir_investigacion(caso_id, investigacion_id)
+        investigacion.registrar("analizar", "analizó las oportunidades")
+    return [
+        {"persona": fila["Persona"], "lugar": fila["Lugar"]}
+        for fila in consultar(f"api_oportunidad({caso_id}, Persona, Lugar)")
+    ]
+
+
 @app.get("/api/casos/{caso_id}/contradicciones", tags=["investigación"])
 async def listar_contradicciones(
     caso_id: str, investigacion_id: Optional[str] = None
@@ -670,14 +728,19 @@ async def acusar(caso_id: str, acusacion: Acusacion) -> dict[str, Any]:
 
 @app.get("/api/admin/estado", tags=["administración"])
 async def estado_del_proyecto() -> dict[str, Any]:
-    """Estado de los casos contra los mínimos del enunciado, para el módulo
-    administrativo.
+    """Estado de los casos contra los cinco mínimos del enunciado, para el
+    módulo administrativo.
 
-    TODO(backend): contar también las reglas de inferencia propias de cada caso.
+    Las reglas de inferencia propias se agregan acá y no en `/api/casos`: son la
+    única cuenta que exige recorrer las cláusulas de cada caso, y solo esta
+    vista las necesita.
     """
     minimos = consultar("minimos_requeridos(S, E, L, D, R)")
     fila_min = minimos[0] if minimos else {}
     casos = await listar_casos()
+    reglas = {fila["M"]: fila["N"] for fila in consultar("api_reglas_propias(M, N)")}
+    for caso in casos:
+        caso["conteos"]["reglas_de_inferencia"] = reglas.get(caso["id"])
     return {
         "minimos_por_caso": {
             "sospechosos": fila_min.get("S"),

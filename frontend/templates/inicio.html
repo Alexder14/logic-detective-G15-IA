@@ -29,7 +29,10 @@
             <small>{{ caso.descripcion }}</small>
           </td>
           <td>{{ caso.dificultad }}</td>
-          <td><span class="etiqueta {{ caso.estado }}">{{ caso.estado }}</span></td>
+          <td>
+            <span class="etiqueta {{ caso.estado }}">{{ caso.estado }}</span>
+            {% if caso.es_ejemplo %}<span class="etiqueta ejemplo">ejemplo</span>{% endif %}
+          </td>
           <td><a href="{{ url_for('investigar_caso', caso_id=caso.id) }}">Abrir</a></td>
         </tr>
       {% endfor %}

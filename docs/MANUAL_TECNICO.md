@@ -137,7 +137,7 @@ logic-detective-G15-IA/
 │   └── Dockerfile
 ├── frontend/
 │   ├── app.py                  Servidor Flask
-│   ├── templates/              base, inicio, investigacion, caso, admin
+│   ├── templates/              base, inicio, investigacion, caso, informe, admin
 │   ├── static/estilos.css
 │   └── Dockerfile
 ├── tests/
@@ -160,20 +160,41 @@ Prolog:
 | Método y ruta | Predicado Prolog | Devuelve |
 | --- | --- | --- |
 | `GET /health` | `version_motor/1` | Estado del motor |
-| `GET /api/casos` | `api_caso/10` | Lista de casos con estado y conteos |
-| `GET /api/casos/{id}` | `api_caso/10` | Descripción inicial del incidente |
+| `GET /api/casos` | `api_caso/10`, `api_caso_de_ejemplo/1` | Lista de casos con estado y conteos. Acepta `?dificultad=` y `?estado=` |
+| `GET /api/casos/{id}` | `api_caso/10`, `api_caso_de_ejemplo/1` | Descripción inicial del incidente |
 | `GET /api/casos/{id}/sospechosos` | `api_sospechoso/4` + `api_indicio/3` | Personas con nivel de sospecha, puntaje e indicios |
 | `GET /api/casos/{id}/evidencias` | `api_evidencia/7` + `api_evidencia_incrimina/3` | Evidencias y a quién incriminan |
 | `GET /api/casos/{id}/lugares` | `api_lugar/4` | Lugares y cuál es la escena |
 | `GET /api/casos/{id}/declaraciones` | `api_declaracion/4` | Testimonios |
 | `GET /api/casos/{id}/coartadas` | `api_coartada/4` | Coartadas y si son válidas |
+| `GET /api/casos/{id}/relaciones` | `api_relacion/6` | Vínculos entre las personas, marcando los conflictivos y a la víctima |
 | `GET /api/casos/{id}/motivos` | `api_motivo/3` | Motivos por persona |
+| `GET /api/casos/{id}/oportunidades` | `api_oportunidad/3` | Quién pudo estar en la escena sin coartada que lo descarte |
 | `GET /api/casos/{id}/contradicciones` | `api_contradiccion/4` | Inconsistencias detectadas |
 | `GET /api/casos/{id}/linea-temporal` | `api_evento/4` | Eventos ordenados por hora |
 | `GET /api/casos/{id}/pistas` | `api_pista/2` | Pistas del sistema |
 | `GET /api/casos/{id}/conclusion` | `api_conclusion/3`, `api_veredicto/5`, `api_explicacion/4` | Responsable, cómplices y **reglas activadas** |
 | `POST /api/casos/{id}/acusacion` | `api_acusacion/4` | Veredicto de la acusación |
-| `GET /api/admin/estado` | `api_caso/10`, `estado_caso/3` | Avance de los casos contra los mínimos |
+| `GET /api/admin/estado` | `api_caso/10`, `estado_caso/3`, `api_reglas_propias/2` | Avance de los casos contra los cinco mínimos, reglas de inferencia incluidas |
+
+Los endpoints del descubrimiento progresivo y la bitácora. Una **investigación**
+es una partida sobre un caso: vive en la memoria del backend
+(`backend/app/investigaciones.py`), no en Prolog, porque es estado del usuario y
+no conocimiento del caso.
+
+| Método y ruta | Predicado Prolog | Devuelve |
+| --- | --- | --- |
+| `POST /api/casos/{id}/investigaciones` | — | Abre una investigación: id y puntaje inicial (100) |
+| `GET …/investigaciones/{inv}/bitacora` | — | Puntaje y acciones registradas, en orden |
+| `GET …/investigaciones/{inv}/informe` | `api_conclusion/3`, `api_veredicto/5`, `api_explicacion/4` | Informe final: avance, bitácora y conclusión |
+| `POST …/evidencias/{id}/examinar` | `api_evidencia/7` + `api_evidencia_incrimina/3` | La evidencia, y la marca como examinada |
+| `POST …/declaraciones/{id}/interrogar` | `api_declaracion/4` | La declaración, y la marca como interrogada |
+| `POST …/pistas/siguiente` | `api_pista/2` | La próxima pista sin usar. Descuenta 5 puntos |
+
+Los endpoints de solo lectura aceptan además `?investigacion_id=`. Con él,
+`evidencias` y `declaraciones` devuelven **solo lo ya descubierto**, y los demás
+registran la consulta en la bitácora. Sin él devuelven todo y no registran nada,
+que es el modo de referencia o administrativo.
 
 ### 4.1 Ejemplos
 
@@ -213,15 +234,44 @@ específicas para esto en `tests/test_api.py`.
 
 ### 4.4 Rutas de la interfaz
 
-| Ruta | Módulo | Descripción |
+| Ruta | Método | Descripción |
 | --- | --- | --- |
-| `/` | — | Inicio: nombre, propósito, casos y accesos a los dos módulos |
-| `/investigacion` | Investigación | Listado de casos. Acepta `?dificultad=` y `?estado=` |
-| `/investigacion/aleatorio` | Investigación | Sortea un caso con hechos cargados y redirige |
-| `/investigacion/<caso_id>` | Investigación | Vista de trabajo del detective |
-| `/investigacion/<caso_id>/acusacion` | Investigación | `POST` de la acusación final |
-| `/admin` | Administrativo | Avance de los casos contra los mínimos |
-| `/salud` | — | Healthcheck del contenedor |
+| `/` | GET | Inicio: nombre, propósito, casos y accesos a los dos módulos |
+| `/investigacion` | GET | Listado de casos. Acepta `?dificultad=` y `?estado=`, que reenvía al backend |
+| `/investigacion/aleatorio` | GET | Sortea un caso con hechos cargados y redirige |
+| `/investigacion/<caso>` | GET | Expediente del caso. Con investigación abierta, el panel de trabajo. Acepta `?analisis=` |
+| `/investigacion/<caso>/abrir` | POST | Abre una investigación nueva (también sirve para reiniciar) |
+| `/investigacion/<caso>/evidencias/<id>/examinar` | POST | Examina una evidencia |
+| `/investigacion/<caso>/declaraciones/<id>/interrogar` | POST | Interroga a quien dio una declaración |
+| `/investigacion/<caso>/pista` | POST | Pide la próxima pista |
+| `/investigacion/<caso>/acusacion` | POST | Acusación final |
+| `/investigacion/<caso>/informe` | GET | Informe final de la investigación |
+| `/admin` | GET | Avance de los casos y las investigaciones de la sesión |
+| `/salud` | GET | Healthcheck del contenedor |
+
+### 4.5 Descubrimiento progresivo en la interfaz
+
+Tres decisiones del frontend que no se leen solas en el código:
+
+1. **La cookie guarda solo el id.** `session["investigaciones"]` es
+   `{caso_id: investigacion_id}`; todo el progreso vive en el backend. Como las
+   investigaciones son estado en memoria, un reinicio del backend deja la cookie
+   apuntando a la nada: la vista del caso lo detecta cuando la bitácora responde
+   404, olvida el id y ofrece abrir una nueva.
+
+2. **Dos llamadas por lista.** Para dibujar el botón «Examinar» hacen falta los
+   identificadores de las evidencias, y esos solo salen de la llamada sin
+   `investigacion_id`. La interfaz junta las dos listas en `descubrimiento()` y
+   de lo que todavía no se descubrió deja pasar únicamente el id —el autor, en
+   las declaraciones—, así el dato que el detective no descubrió nunca llega al
+   HTML. Hay pruebas de esa propiedad en `tests/test_frontend.py`.
+
+3. **Los análisis son enlaces, no carga automática.** Consultar sospechosos,
+   lugares, relaciones, coartadas, motivos, oportunidades, contradicciones o la
+   línea temporal queda registrado en la bitácora, así que se piden de a uno con
+   `?analisis=`. Si la vista los
+   cargara todos al abrir el caso, la bitácora diría qué renderizó Flask en vez
+   de qué hizo el detective.
 
 ---
 
@@ -242,6 +292,15 @@ Se usa `include/1` y no `use_module/1` a propósito: las reglas tienen que
 resolverse contra los hechos *de ese módulo*. Como la lista de exportación es
 vacía, `caso1` y `caso2` pueden tener sospechosos con el mismo nombre sin
 interferir entre sí.
+
+> **Cómo se cuentan las reglas propias de un caso.** Como el `include` es
+> textual, las reglas compartidas aparecen como definidas en el módulo del caso
+> y no alcanza con mirar el módulo. `reglas_propias/2` las separa por el archivo
+> de origen de cada cláusula (`clause_property/2`) y cuenta predicados, no
+> cláusulas: un predicado con tres cláusulas es una regla con tres casos. Es el
+> criterio más conservador, así que si el número llega al mínimo, llega de
+> sobra. Es el quinto mínimo del enunciado y `estado_caso/3` ahora lo exige para
+> declarar un caso `completo`.
 
 ### 5.2 Esquema de hechos
 
@@ -526,6 +585,7 @@ curl -fsS localhost:8000/health
 | La interfaz muestra "No se pudo contactar al backend" | El backend está caído o `BACKEND_URL` apunta mal | Verificar `curl localhost:8000/health` y el valor de `BACKEND_URL` |
 | Un caso aparece como `pendiente` | `casoN.pl` todavía no tiene hechos | Es lo esperado hasta que su responsable lo llene |
 | Un caso aparece como `incompleto` | Tiene hechos pero no llega a los mínimos | Ver el conteo en `/admin` o con el comando de la sección 6 |
+| `caso_demo` aparece como `incompleto` | Es correcto: es la plantilla de referencia, no uno de los tres entregables | Nada. Sale marcado como `ejemplo` y la interfaz lo aclara |
 | `?- casoN:responsable(P).` da más de una respuesta | El caso no discrimina lo suficiente entre sospechosos | Revisar motivos, medios y coartadas de los distractores |
 | `existence_error` al consultar un caso | Se usó un predicado fuera del esquema | Revisar la sección 5.2 |
 | `pytest` falla al importar `pyswip` | Se instaló PySwip antes que SWI-Prolog | Instalar Prolog primero y reinstalar `pyswip` |

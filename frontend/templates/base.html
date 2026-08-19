@@ -18,7 +18,10 @@
         <span>Logic Detective</span>
       </a>
       <nav aria-label="Módulos del sistema">
-        {% set en_investigacion = request.endpoint in ['investigacion', 'investigar_caso', 'acusar', 'caso_aleatorio'] %}
+        {% set en_investigacion = request.endpoint in [
+             'investigacion', 'investigar_caso', 'caso_aleatorio',
+             'abrir_investigacion', 'examinar_evidencia', 'interrogar',
+             'pedir_pista', 'acusar', 'informe'] %}
         <a href="{{ url_for('investigacion') }}"
            class="{{ 'activo' if en_investigacion }}"
            {% if en_investigacion %}aria-current="page"{% endif %}>Investigación</a>
@@ -47,10 +50,6 @@
     <p>
       <strong>Proyecto 1 — Inteligencia Artificial 1</strong> ·
       Facultad de Ingeniería, USAC · Grupo 15 · segundo semestre 2026
-    </p>
-    <p class="nota">
-      Toda la deducción la ejecuta un motor de inferencia en SWI-Prolog.
-      Esta interfaz solo consulta y presenta.
     </p>
   </footer>
 </body>
