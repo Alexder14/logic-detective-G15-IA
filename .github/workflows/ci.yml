@@ -123,11 +123,25 @@ jobs:
         run: |
           curl -fsS http://localhost:8000/health | tee /dev/stderr | grep -q '"prolog":"conectado"'
 
+      # Recorre la investigación completa: sin abrirla no se ve nada del caso,
+      # y el informe final solo sale si Prolog dedujo el responsable.
       - name: Verificar la interfaz
         run: |
+          JAR=$(mktemp)
           curl -fsS http://localhost:8080/ > /dev/null
           curl -fsS http://localhost:8080/admin > /dev/null
-          curl -fsS http://localhost:8080/investigacion/caso_demo | grep -q "bruno"
+          curl -fsS -c "$JAR" http://localhost:8080/investigacion/caso_demo \
+            | grep -q "Expediente cerrado"
+          curl -fsS -b "$JAR" -c "$JAR" -X POST -o /dev/null \
+            http://localhost:8080/investigacion/caso_demo/abrir
+          curl -fsS -b "$JAR" -c "$JAR" -X POST -o /dev/null \
+            http://localhost:8080/investigacion/caso_demo/evidencias/e1/examinar
+          curl -fsS -b "$JAR" -c "$JAR" \
+            "http://localhost:8080/investigacion/caso_demo?analisis=sospechosos" \
+            | grep -qi "bruno"
+          curl -fsS -b "$JAR" -c "$JAR" \
+            http://localhost:8080/investigacion/caso_demo/informe \
+            | tee /dev/stderr | grep -q "examinó la evidencia e1"
 
       - name: Logs si algo falló
         if: failure()
