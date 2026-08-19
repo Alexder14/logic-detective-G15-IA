@@ -173,7 +173,7 @@
 caso(caso2,
      'El Sabotaje en el Laboratorio de I+D',
      'A las 22:00 horas se produjo la destrucción de los servidores principales y el robo de la fórmula del prototipo X-100 en la empresa BioTech. La víctima principal es el Dr. Aris, científico jefe. El culpable destruyó los respaldos y extrajo la fórmula utilizando conocimientos técnicos y llaves de acceso.',
-     media).
+     dificil).
 
 
 % --- Personas ---------------------------------------------------------------
