@@ -65,6 +65,9 @@
             <a href="{{ url_for('investigar_caso', caso_id=caso.id) }}">{{ caso.titulo }}</a>
           </h2>
           <span class="etiqueta {{ caso.estado }}">{{ caso.estado }}</span>
+          {% if caso.es_ejemplo %}
+            <span class="etiqueta ejemplo">ejemplo</span>
+          {% endif %}
         </div>
 
         <p class="tarjeta-descripcion">{{ caso.descripcion }}</p>

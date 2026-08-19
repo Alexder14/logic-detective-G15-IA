@@ -295,6 +295,9 @@ tbody tr:last-child td { border-bottom: 0; }
 .etiqueta.incompleto { color: var(--aviso);  background: var(--aviso-fondo);  border-color: var(--aviso); }
 .etiqueta.pendiente  { color: var(--suave);  background: var(--superficie-2); border-color: var(--borde-fuerte); }
 
+/* Caso de referencia: no cuenta entre los tres entregables. */
+.etiqueta.ejemplo { color: var(--acento); background: var(--acento-claro); border-color: var(--acento); }
+
 /* Coartadas y veredictos de acusación */
 .etiqueta.valida,   .etiqueta.correcta   { color: var(--ok);     background: var(--ok-fondo);     border-color: var(--ok); }
 .etiqueta.invalida, .etiqueta.incorrecta { color: var(--alerta); background: var(--alerta-fondo); border-color: var(--alerta); }
@@ -484,6 +487,117 @@ form button {
 }
 form button:hover { background: var(--acento-oscuro); border-color: var(--acento-oscuro); }
 
+/* Panel de investigación: marcador de puntaje y avance */
+.marcador {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.1rem 1.35rem;
+  margin: 1.5rem 0;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+}
+.marcador-dato { display: flex; flex-direction: column; line-height: 1.2; }
+.marcador-n {
+  font-family: var(--serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--acento);
+}
+.marcador-etiqueta {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--suave);
+}
+.marcador-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+.marcador-acciones form { margin: 0; }
+
+/* El resultado del análisis que pidió el detective: se despega del resto. */
+.resultado-analisis { border-left: 4px solid var(--acento); }
+
+/* Descubrimiento progresivo: lo hallado se ve, lo que falta se ofrece. */
+.hallazgos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.75rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.hallazgos li {
+  padding: 0.85rem 1rem;
+  margin: 0;
+  border-radius: var(--radio-chico);
+}
+.hallazgos li p:last-child { margin-bottom: 0; }
+.hallazgos .hallado {
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+}
+.hallazgos .por-hallar {
+  color: var(--suave);
+  background: transparent;
+  border: 1px dashed var(--borde-fuerte);
+}
+.hallazgos form { margin-top: 0.5rem; }
+h2 small { font-weight: 400; color: var(--suave); }
+
+/* Bitácora: una línea por acción, en el orden en que ocurrieron. */
+.bitacora {
+  padding-left: 1.2rem;
+  margin: 0;
+  font-size: 0.95rem;
+}
+.bitacora li { margin-bottom: 0.45rem; }
+.bitacora .hora {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--suave);
+}
+.etiqueta.accion {
+  color: var(--acento);
+  background: var(--acento-claro);
+  border-color: var(--acento);
+}
+
+/* Indicios: uno por etiqueta, para que se lean de un vistazo. */
+.etiqueta.indicio {
+  margin: 0 0.2rem 0.2rem 0;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--suave);
+}
+
+/* Pistas: la lectura en castellano primero, el termino del motor al lado. */
+.pistas { padding-left: 1.2rem; }
+.pistas li { margin-bottom: 0.4rem; }
+.pistas code { font-size: 0.8rem; color: var(--suave); }
+
+/* Veredictos del motor sobre cada persona */
+.etiqueta.responsable        { color: #fff;           background: var(--alerta);       border-color: var(--alerta); }
+.etiqueta.complice           { color: var(--alerta);  background: var(--alerta-fondo); border-color: var(--alerta); }
+.etiqueta.bajo_investigacion { color: var(--aviso);   background: var(--aviso-fondo);  border-color: var(--aviso); }
+.etiqueta.descartado         { color: var(--suave);   background: var(--superficie-2); border-color: var(--borde-fuerte); }
+
+/* Informe final */
+.veredicto-final {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+}
+.linea-temporal { padding-left: 1.2rem; }
+.linea-temporal li { margin-bottom: 0.35rem; }
+
 /* ------------------------------------------------------------- responsive */
 
 @media (max-width: 40rem) {
@@ -492,6 +606,7 @@ form button:hover { background: var(--acento-oscuro); border-color: var(--acento
   h1 { font-size: 1.5rem; }
   section { padding: 1rem; }
   .filtro-azar { margin-left: 0; }
+  .marcador-acciones { margin-left: 0; }
   .lista-casos { grid-template-columns: 1fr; }
 
   /* Tablas anchas: que hagan scroll en vez de romper el ancho de la página. */
@@ -506,7 +621,8 @@ form button:hover { background: var(--acento-oscuro); border-color: var(--acento
 /* Para las capturas del manual de usuario y el informe final del caso. */
 
 @media print {
-  header nav, .filtros, .acciones, .salto-contenido { display: none; }
+  header nav, .filtros, .acciones, .salto-contenido,
+  .marcador-acciones, .sin-imprimir, form { display: none; }
   body { background: #fff; color: #000; }
   section, .tarjeta-caso { box-shadow: none; border-color: #999; break-inside: avoid; }
   details { break-inside: avoid; }

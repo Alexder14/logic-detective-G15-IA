@@ -12,6 +12,7 @@
 <p>{{ caso.descripcion }}</p>
 <p>
   <span class="etiqueta {{ caso.estado }}">{{ caso.estado }}</span>
+  {% if caso.es_ejemplo %}<span class="etiqueta ejemplo">ejemplo</span>{% endif %}
   <small>
     {{ caso.conteos.sospechosos }} sospechosos ·
     {{ caso.conteos.evidencias }} evidencias ·
@@ -23,169 +24,305 @@
 {% if caso.estado == 'pendiente' %}
   <p class="aviso">
     Este caso todavía no tiene hechos en <code>prolog/{{ caso.id }}.pl</code>.
-    Las secciones de abajo van a aparecer vacías hasta que se carguen.
+    No hay nada que investigar hasta que se carguen.
+  </p>
+{% elif caso.es_ejemplo %}
+  <p class="aviso">
+    Caso de referencia, más chico que los tres entregables: sirve para ver el
+    sistema funcionando de punta a punta. Por eso figura como incompleto.
   </p>
 {% endif %}
 
-{# TODO(interfaz): esto muestra toda la información de golpe. El enunciado pide
-   que el usuario la descubra con acciones de investigación y que cada acción
-   quede en una bitácora. #}
+{% if not investigacion %}
 
-<section>
-  <h2>Sospechosos</h2>
-  {% if sospechosos %}
-    <table>
-      <thead><tr><th>Persona</th><th>Nivel</th><th>Puntaje</th><th>Indicios</th></tr></thead>
-      <tbody>
-        {% for s in sospechosos %}
-          <tr>
-            <td>{{ s.persona }}</td>
-            <td><span class="etiqueta {{ s.nivel_sospecha }}">{{ s.nivel_sospecha }}</span></td>
-            <td>{{ s.puntaje }}</td>
-            <td><small>{{ s.indicios | join(', ') }}</small></td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}<p class="nota">Sin datos.</p>{% endif %}
-</section>
-
-<section>
-  <h2>Evidencias</h2>
-  {% if evidencias %}
-    <ul>
-      {% for e in evidencias %}
-        <li>
-          <strong>{{ e.id }}</strong> ({{ e.tipo }}{% if e.es_directa %}, directa{% endif %})
-          en {{ e.lugar }} a las {{ e.hora }} — {{ e.descripcion }}
-          {% if e.incrimina %}<em>incrimina a {{ e.incrimina | join(', ') }}</em>{% endif %}
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}<p class="nota">Sin datos.</p>{% endif %}
-</section>
-
-<section>
-  <h2>Lugares</h2>
-  {% if lugares %}
-    <ul>
-      {% for l in lugares %}
-        <li>{{ l.nombre }} — {{ l.descripcion }}
-          {% if l.es_escena %}<strong>(escena del incidente)</strong>{% endif %}</li>
-      {% endfor %}
-    </ul>
-  {% else %}<p class="nota">Sin datos.</p>{% endif %}
-</section>
-
-<section>
-  <h2>Declaraciones</h2>
-  {% if declaraciones %}
-    <ul>
-      {% for d in declaraciones %}
-        <li><strong>{{ d.autor }}</strong> ({{ d.id }}): <code>{{ d.contenido }}</code></li>
-      {% endfor %}
-    </ul>
-  {% else %}<p class="nota">Sin datos.</p>{% endif %}
-</section>
-
-<section>
-  <h2>Coartadas</h2>
-  {% if coartadas %}
-    <ul>
-      {% for c in coartadas %}
-        <li>
-          <strong>{{ c.persona }}</strong>:
-          <span class="etiqueta {{ c.estado }}">{{ c.estado }}</span>
-          <code>{{ c.detalle }}</code>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}<p class="nota">Sin datos.</p>{% endif %}
-</section>
-
-<section>
-  <h2>Motivos</h2>
-  {% if motivos %}
-    <ul>
-      {% for m in motivos %}<li><strong>{{ m.persona }}</strong>: {{ m.motivo }}</li>{% endfor %}
-    </ul>
-  {% else %}<p class="nota">Sin datos.</p>{% endif %}
-</section>
-
-<section>
-  <h2>Contradicciones detectadas</h2>
-  {% if contradicciones %}
-    <ul>
-      {% for c in contradicciones %}
-        <li>{{ c.tipo }}: <code>{{ c.a }}</code> ↔ <code>{{ c.b }}</code></li>
-      {% endfor %}
-    </ul>
-  {% else %}<p class="nota">Sin datos.</p>{% endif %}
-</section>
-
-<section>
-  <h2>Línea temporal</h2>
-  {% if linea_temporal %}
-    <ul>
-      {% for e in linea_temporal %}
-        <li>{{ e.hora }}:00 — {{ e.tipo }}: <code>{{ e.detalle }}</code></li>
-      {% endfor %}
-    </ul>
-  {% else %}<p class="nota">Sin datos.</p>{% endif %}
-</section>
-
-<section>
-  <h2>Pistas</h2>
-  {% if pistas %}
-    <ul>{% for p in pistas %}<li><code>{{ p }}</code></li>{% endfor %}</ul>
-  {% else %}<p class="nota">Sin datos.</p>{% endif %}
-</section>
-
-<section>
-  <h2>Acusación final</h2>
-  {% if sospechosos %}
-    <form method="post" action="{{ url_for('acusar', caso_id=caso.id) }}">
-      <select name="sospechoso">
-        {% for s in sospechosos %}
-          <option value="{{ s.persona }}">{{ s.persona }}</option>
-        {% endfor %}
-      </select>
-      <button type="submit">Acusar</button>
-    </form>
-  {% else %}
-    <p class="nota">No hay sospechosos para acusar todavía.</p>
-  {% endif %}
-</section>
-
-<section>
-  <h2>Conclusión del motor y explicación</h2>
-  {# Es la justificación que exige la rúbrica: qué reglas se activaron. #}
-  {% if conclusion and conclusion.concluye %}
+  {# Portada del expediente: nada de lo que hay que descubrir se muestra acá. #}
+  <section>
+    <h2>Expediente cerrado</h2>
     <p>
-      Responsable según el motor: <strong>{{ conclusion.responsable }}</strong>
+      Al abrir la investigación empezás con <strong>100 puntos</strong> y una
+      bitácora en blanco. Las evidencias se revelan de a una al examinarlas y
+      las declaraciones al interrogar a quien las dio; cada pista que pidas
+      cuesta <strong>5 puntos</strong>. Todo lo que hagas queda registrado.
     </p>
-    {% if conclusion.posibles_complices %}
-      <p>Posibles cómplices: {{ conclusion.posibles_complices | join(', ') }}</p>
-    {% endif %}
-    {% for v in conclusion.veredictos %}
-      <details>
-        <summary>
-          {{ v.persona }} — {{ v.veredicto }}
-          (nivel {{ v.nivel_sospecha }}, puntaje {{ v.puntaje }})
-        </summary>
+    <form method="post" action="{{ url_for('abrir_investigacion', caso_id=caso.id) }}">
+      <button type="submit">Abrir la investigación</button>
+    </form>
+  </section>
+
+{% else %}
+
+  <div class="marcador">
+    <div class="marcador-dato">
+      <span class="marcador-n">{{ investigacion.puntaje }}</span>
+      <span class="marcador-etiqueta">puntaje</span>
+    </div>
+    <div class="marcador-dato">
+      <span class="marcador-n">
+        {{ avance_evidencias.descubiertos }}/{{ avance_evidencias.total }}
+      </span>
+      <span class="marcador-etiqueta">evidencias examinadas</span>
+    </div>
+    <div class="marcador-dato">
+      <span class="marcador-n">
+        {{ avance_declaraciones.descubiertos }}/{{ avance_declaraciones.total }}
+      </span>
+      <span class="marcador-etiqueta">declaraciones tomadas</span>
+    </div>
+    <div class="marcador-dato">
+      <span class="marcador-n">{{ investigacion.acciones | length }}</span>
+      <span class="marcador-etiqueta">acciones en bitácora</span>
+    </div>
+    <div class="marcador-acciones">
+      <a class="boton" href="{{ url_for('informe', caso_id=caso.id) }}">Informe final</a>
+      <form method="post" action="{{ url_for('abrir_investigacion', caso_id=caso.id) }}">
+        <button class="boton secundario" type="submit">Reiniciar</button>
+      </form>
+    </div>
+  </div>
+
+  <section>
+    <h2>Analizar el caso</h2>
+    <p class="nota">
+      Cada análisis le pregunta al motor de inferencia y queda anotado en la
+      bitácora.
+    </p>
+    <div class="filtro-grupo">
+      {% for clave, a in analisis_disponibles.items() %}
+        <a class="chip {{ 'activo' if analisis == clave }}"
+           href="{{ url_for('investigar_caso', caso_id=caso.id, analisis=clave) }}">
+          {{ a.boton }}
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if analisis %}
+    {% set meta = analisis_disponibles[analisis] %}
+    <section class="resultado-analisis">
+      <h2>{{ meta.titulo }}</h2>
+      <p class="nota">{{ meta.detalle }}</p>
+
+      {% if not resultado %}
+        <p class="nota">El motor no devolvió nada para este caso.</p>
+
+      {% elif analisis == 'sospechosos' %}
+        <table>
+          <thead><tr><th>Persona</th><th>Nivel</th><th>Puntaje</th><th>Indicios</th></tr></thead>
+          <tbody>
+            {% for s in resultado %}
+              <tr>
+                <td>{{ s.persona | nombre }}</td>
+                <td><span class="etiqueta {{ s.nivel_sospecha }}">{{ s.nivel_sospecha }}</span></td>
+                <td>{{ s.puntaje }}</td>
+                <td>
+                  {% for i in s.indicios %}
+                    <span class="etiqueta indicio">{{ i | indicio }}</span>
+                  {% endfor %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+      {% elif analisis == 'lugares' %}
         <ul>
-          {% for r in v.reglas_activadas %}
-            <li><code>{{ r.regla }}</code> → {{ r.detalle }}</li>
+          {% for l in resultado %}
+            <li>
+              <strong>{{ l.nombre | nombre }}</strong> — {{ l.descripcion }}
+              {% if l.es_escena %}<span class="etiqueta invalida">escena del incidente</span>{% endif %}
+            </li>
           {% endfor %}
         </ul>
-      </details>
-    {% endfor %}
-  {% elif conclusion %}
-    <p class="nota">
-      El motor no reúne elementos suficientes para señalar a un responsable.
-    </p>
-  {% else %}<p class="nota">Sin datos.</p>{% endif %}
-</section>
 
+      {% elif analisis == 'coartadas' %}
+        <ul>
+          {% for c in resultado %}
+            <li>
+              <strong>{{ c.persona | nombre }}</strong>
+              <span class="etiqueta {{ c.estado }}">{{ c.estado }}</span>
+              <code>{{ c.detalle }}</code>
+            </li>
+          {% endfor %}
+        </ul>
+
+      {% elif analisis == 'relaciones' %}
+        <ul>
+          {% for r in resultado %}
+            <li>
+              <strong>{{ r.persona | nombre }}</strong> →
+              {{ r.con_quien | nombre }}{% if r.es_con_la_victima %} <small>(la víctima)</small>{% endif %}:
+              {{ r.tipo | nombre }}
+              {% if r.es_conflictiva %}
+                <span class="etiqueta invalida">conflictiva</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+
+      {% elif analisis == 'oportunidades' %}
+        <ul>
+          {% for o in resultado %}
+            <li>
+              <strong>{{ o.persona | nombre }}</strong> pudo estar en
+              {{ o.lugar | nombre }} sin coartada que lo descarte.
+            </li>
+          {% endfor %}
+        </ul>
+
+      {% elif analisis == 'motivos' %}
+        <ul>
+          {% for m in resultado %}
+            <li><strong>{{ m.persona | nombre }}</strong>: {{ m.motivo }}</li>
+          {% endfor %}
+        </ul>
+
+      {% elif analisis == 'contradicciones' %}
+        <ul>
+          {% for c in resultado %}
+            <li>{{ c.tipo }}: <code>{{ c.a }}</code> ↔ <code>{{ c.b }}</code></li>
+          {% endfor %}
+        </ul>
+
+      {% elif analisis == 'linea-temporal' %}
+        <ol class="linea-temporal">
+          {% for e in resultado %}
+            <li><strong>{{ e.hora }}:00</strong> — {{ e.tipo }}: <code>{{ e.detalle }}</code></li>
+          {% endfor %}
+        </ol>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  <section>
+    <h2>Evidencias
+      <small>({{ avance_evidencias.descubiertos }} de {{ avance_evidencias.total }})</small>
+    </h2>
+    {% if evidencias %}
+      <ul class="hallazgos">
+        {% for e in evidencias %}
+          <li class="{{ 'hallado' if e.descubierto else 'por-hallar' }}">
+            {% if e.descubierto %}
+              <p>
+                <strong>{{ e.id }}</strong>
+                <span class="etiqueta">{{ e.tipo }}</span>
+                {% if e.es_directa %}<span class="etiqueta invalida">directa</span>{% endif %}
+                en {{ e.lugar | nombre }}
+                {% if e.hora != 'desconocida' %}a las {{ e.hora }}:00{% else %}(hora desconocida){% endif %}
+              </p>
+              <p>{{ e.descripcion }}</p>
+              {% if e.incrimina %}
+                <p class="nota">
+                  Incrimina a
+                  {% for p in e.incrimina %}<strong>{{ p | nombre }}</strong>{{ ', ' if not loop.last }}{% endfor %}
+                </p>
+              {% endif %}
+            {% else %}
+              <p><strong>{{ e.id }}</strong> <span class="nota">sin examinar</span></p>
+              <form method="post"
+                    action="{{ url_for('examinar_evidencia', caso_id=caso.id, evidencia_id=e.id) }}">
+                <input type="hidden" name="analisis" value="{{ analisis }}">
+                <button type="submit" aria-label="Examinar la evidencia {{ e.id }}">
+                  Examinar
+                </button>
+              </form>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}<p class="nota">Este caso no tiene evidencias cargadas.</p>{% endif %}
+  </section>
+
+  <section>
+    <h2>Declaraciones
+      <small>({{ avance_declaraciones.descubiertos }} de {{ avance_declaraciones.total }})</small>
+    </h2>
+    {% if declaraciones %}
+      <ul class="hallazgos">
+        {% for d in declaraciones %}
+          <li class="{{ 'hallado' if d.descubierto else 'por-hallar' }}">
+            <p><strong>{{ d.autor | nombre }}</strong> <small>({{ d.id }})</small></p>
+            {% if d.descubierto %}
+              <p><code>{{ d.contenido }}</code></p>
+            {% else %}
+              <form method="post"
+                    action="{{ url_for('interrogar', caso_id=caso.id, declaracion_id=d.id) }}">
+                <input type="hidden" name="analisis" value="{{ analisis }}">
+                <button type="submit"
+                        aria-label="Interrogar a {{ d.autor | nombre }} sobre {{ d.id }}">
+                  Interrogar
+                </button>
+              </form>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}<p class="nota">Este caso no tiene declaraciones cargadas.</p>{% endif %}
+  </section>
+
+  <section>
+    <h2>Pistas
+      <small>({{ investigacion.pistas | length }} de {{ investigacion.pistas_totales }})</small>
+    </h2>
+    {% if investigacion.pistas %}
+      <ul class="pistas">
+        {% for p in investigacion.pistas %}
+          <li>{{ p | pista }} <code>{{ p }}</code></li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="nota">Todavía no pediste ninguna pista.</p>
+    {% endif %}
+    {% if investigacion.pistas | length < investigacion.pistas_totales %}
+      <form method="post" action="{{ url_for('pedir_pista', caso_id=caso.id) }}">
+        <input type="hidden" name="analisis" value="{{ analisis }}">
+        <button class="boton secundario" type="submit">Pedir una pista (−5 puntos)</button>
+      </form>
+    {% else %}
+      <p class="nota">Ya no quedan pistas por pedir en este caso.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Acusación final</h2>
+    {% if personas %}
+      <p class="nota">
+        El motor va a decir si tu deducción coincide con la suya, y por qué.
+        La acusación queda en la bitácora.
+      </p>
+      <form method="post" action="{{ url_for('acusar', caso_id=caso.id) }}">
+        <input type="hidden" name="analisis" value="{{ analisis }}">
+        <select name="sospechoso" aria-label="Sospechoso a acusar">
+          {% for p in personas %}
+            <option value="{{ p }}">{{ p | nombre }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Acusar</button>
+      </form>
+    {% else %}
+      <p class="nota">No hay sospechosos para acusar todavía.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Bitácora de investigación</h2>
+    {% if investigacion.acciones %}
+      <ol class="bitacora">
+        {% for a in investigacion.acciones %}
+          <li>
+            <span class="hora">{{ a.momento[11:19] }}</span>
+            <span class="etiqueta accion">{{ a.tipo }}</span>
+            {{ a.detalle }}
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p class="nota">
+        Sin acciones todavía. Examiná una evidencia o analizá el caso para
+        empezar.
+      </p>
+    {% endif %}
+  </section>
+
+{% endif %}
 {% endif %}
 {% endblock %}
