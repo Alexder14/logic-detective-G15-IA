@@ -24,7 +24,7 @@ graph LR
 
     subgraph FE["Contenedor frontend · puerto 8080"]
         F["Flask + Jinja2<br/>app.py"]
-        T["Plantillas<br/>base · inicio · investigacion<br/>caso · admin"]
+        T["Plantillas<br/>base · inicio · investigacion<br/>caso · informe · admin"]
         S["estilos.css"]
     end
 
@@ -148,9 +148,11 @@ flowchart TD
     EXP --> FIN(["Informe final del caso"])
 ```
 
-> Las etapas de descubrimiento progresivo y bitácora corresponden a los `TODO`
-> abiertos en `backend/app/main.py` y `frontend/templates/caso.html`. El resto
-> del recorrido ya está implementado.
+> Todo el recorrido está implementado. Las acciones de investigación son
+> enlaces y formularios explícitos (`?analisis=`, `POST .../examinar`,
+> `POST .../interrogar`, `POST .../pista`): cada una queda en la bitácora, así
+> que ninguna se dispara al abrir la página. La descripción inicial del
+> incidente es lo único que se ve antes de abrir la investigación.
 
 ---
 
