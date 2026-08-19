@@ -142,3 +142,26 @@ def test_admin_reporta_el_avance_contra_los_minimos(cliente):
     assert estado["minimos_por_caso"]["sospechosos"] == 4
     assert estado["minimos_por_caso"]["evidencias"] == 10
     assert estado["prolog"]["disponible"] is True
+
+
+def test_admin_cuenta_las_reglas_de_inferencia_de_cada_caso(cliente):
+    """Es el quinto mínimo del enunciado: sin la cuenta no se puede verificar."""
+    estado = cliente.get("/api/admin/estado").json()
+    minimo = estado["minimos_por_caso"]["reglas_de_inferencia"]
+    assert minimo == 10
+
+    reglas = {
+        caso["id"]: caso["conteos"]["reglas_de_inferencia"] for caso in estado["casos"]
+    }
+    for caso_id in ("caso1", "caso2", "caso3"):
+        assert reglas[caso_id] >= minimo, f"{caso_id} no llega a {minimo} reglas"
+    # El de referencia no declara reglas propias: solo usa las compartidas.
+    assert reglas["caso_demo"] == 0
+
+
+def test_un_caso_sin_sus_reglas_propias_no_puede_estar_completo(motor):
+    """Las reglas compartidas de reglas_base.pl no cuentan como propias, así que
+    un caso que solo las use no alcanza el mínimo."""
+    filas = motor.filas("estado_caso(caso_demo, Estado, _)")
+    assert filas[0]["Estado"] == "incompleto"
+    assert motor.filas("reglas_propias(caso_demo, N)")[0]["N"] == 0

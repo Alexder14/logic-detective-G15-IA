@@ -12,11 +12,13 @@
             caso_de_ejemplo/1,
             consulta/2,
             estado_caso/3,
+            reglas_propias/2,
             minimos_requeridos/5,
             version_motor/1,
             % fachada plana para el backend (una solucion por fila)
             api_caso/10,
             api_caso_de_ejemplo/1,
+            api_reglas_propias/2,
             api_sospechoso/4,
             api_indicio/3,
             api_evidencia/7,
@@ -92,13 +94,42 @@ consulta(Modulo, Meta) :-
     caso_modulo(Modulo),
     call(Modulo:Meta).
 
+%! reglas_propias(+Modulo, -Cuantas) is det.
+%  Cuantas reglas de inferencia declara el caso por su cuenta, sin contar las
+%  compartidas de reglas_base.pl. Es el quinto minimo del enunciado, el unico
+%  que el modulo administrativo no podia verificar.
+%
+%  Cada caso incluye reglas_base.pl textualmente (:- include), asi que sus
+%  reglas aparecen como definidas en el modulo del caso y no se pueden separar
+%  por el modulo. Lo que si las distingue es el archivo de origen de cada
+%  clausula, que da clause_property/2.
+%
+%  Cuenta predicados, no clausulas: un predicado con tres clausulas es una
+%  regla con tres casos, no tres reglas. Es el criterio mas conservador de los
+%  dos, asi que si este numero alcanza el minimo, alcanza de sobra.
+reglas_propias(Modulo, Cuantas) :-
+    caso_modulo(Modulo),
+    atom_concat(Modulo, '.pl', Archivo),
+    findall(Nombre/Aridad,
+            (   current_predicate(Modulo:Nombre/Aridad),
+                functor(Cabeza, Nombre, Aridad),
+                \+ predicate_property(Modulo:Cabeza, imported_from(_)),
+                catch(clause(Modulo:Cabeza, Cuerpo, Referencia), _, fail),
+                Cuerpo \== true,
+                clause_property(Referencia, file(Origen)),
+                file_base_name(Origen, Archivo)
+            ),
+            Predicados),
+    sort(Predicados, Unicos),
+    length(Unicos, Cuantas).
+
 %! estado_caso(?Modulo, -Estado, -Resumen) is nondet.
 %  Estado = pendiente | incompleto | completo
 %  Resumen = resumen(Sospechosos, Evidencias, Lugares, Declaraciones, Coartadas)
 %
 %  - pendiente:  el archivo aun no tiene hechos.
 %  - incompleto: tiene hechos pero no alcanza los minimos del enunciado.
-%  - completo:   cumple los minimos.
+%  - completo:   cumple los cinco minimos, incluidas las reglas propias.
 %
 %  Esto es lo que el modulo administrativo muestra como avance del proyecto.
 estado_caso(Modulo, Estado, Resumen) :-
@@ -107,11 +138,13 @@ estado_caso(Modulo, Estado, Resumen) :-
     Resumen = resumen(Sospechosos, Evidencias, Lugares, Declaraciones, _),
     (   Sospechosos =:= 0
     ->  Estado = pendiente
-    ;   minimos_requeridos(MinS, MinE, MinL, MinD, _),
+    ;   minimos_requeridos(MinS, MinE, MinL, MinD, MinR),
         Sospechosos >= MinS,
         Evidencias >= MinE,
         Lugares >= MinL,
-        Declaraciones >= MinD
+        Declaraciones >= MinD,
+        reglas_propias(Modulo, Reglas),
+        Reglas >= MinR
     ->  Estado = completo
     ;   Estado = incompleto
     ).
@@ -145,6 +178,12 @@ api_caso(Modulo, Id, Titulo, Descripcion, Dificultad, Estado, NS, NE, NL, ND) :-
 %  alcanza los minimos.
 api_caso_de_ejemplo(Modulo) :-
     caso_de_ejemplo(Modulo).
+
+%! api_reglas_propias(?Modulo, -Cuantas) is nondet.
+%  Fila por caso con su cuenta de reglas de inferencia propias.
+api_reglas_propias(Modulo, Cuantas) :-
+    caso_modulo(Modulo),
+    reglas_propias(Modulo, Cuantas).
 
 %! api_sospechoso(+Modulo, -Persona, -Nivel, -Puntaje) is nondet.
 %  Ordenados de mayor a menor puntaje por ranking_sospecha/1.

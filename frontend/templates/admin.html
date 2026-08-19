@@ -31,7 +31,7 @@
     <thead>
       <tr>
         <th>Caso</th><th>Estado</th>
-        <th>Sosp.</th><th>Evid.</th><th>Lug.</th><th>Decl.</th>
+        <th>Sosp.</th><th>Evid.</th><th>Lug.</th><th>Decl.</th><th>Reglas</th>
       </tr>
     </thead>
     <tbody>
@@ -48,6 +48,7 @@
           <td>{{ caso.conteos.evidencias }}/{{ estado.minimos_por_caso.evidencias }}</td>
           <td>{{ caso.conteos.lugares }}/{{ estado.minimos_por_caso.lugares }}</td>
           <td>{{ caso.conteos.declaraciones }}/{{ estado.minimos_por_caso.declaraciones }}</td>
+          <td>{{ caso.conteos.reglas_de_inferencia }}/{{ estado.minimos_por_caso.reglas_de_inferencia }}</td>
         </tr>
       {% endfor %}
     </tbody>

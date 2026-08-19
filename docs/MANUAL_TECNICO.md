@@ -175,7 +175,7 @@ Prolog:
 | `GET /api/casos/{id}/pistas` | `api_pista/2` | Pistas del sistema |
 | `GET /api/casos/{id}/conclusion` | `api_conclusion/3`, `api_veredicto/5`, `api_explicacion/4` | Responsable, cómplices y **reglas activadas** |
 | `POST /api/casos/{id}/acusacion` | `api_acusacion/4` | Veredicto de la acusación |
-| `GET /api/admin/estado` | `api_caso/10`, `estado_caso/3` | Avance de los casos contra los mínimos |
+| `GET /api/admin/estado` | `api_caso/10`, `estado_caso/3`, `api_reglas_propias/2` | Avance de los casos contra los cinco mínimos, reglas de inferencia incluidas |
 
 Los endpoints del descubrimiento progresivo y la bitácora. Una **investigación**
 es una partida sobre un caso: vive en la memoria del backend
@@ -292,6 +292,15 @@ Se usa `include/1` y no `use_module/1` a propósito: las reglas tienen que
 resolverse contra los hechos *de ese módulo*. Como la lista de exportación es
 vacía, `caso1` y `caso2` pueden tener sospechosos con el mismo nombre sin
 interferir entre sí.
+
+> **Cómo se cuentan las reglas propias de un caso.** Como el `include` es
+> textual, las reglas compartidas aparecen como definidas en el módulo del caso
+> y no alcanza con mirar el módulo. `reglas_propias/2` las separa por el archivo
+> de origen de cada cláusula (`clause_property/2`) y cuenta predicados, no
+> cláusulas: un predicado con tres cláusulas es una regla con tres casos. Es el
+> criterio más conservador, así que si el número llega al mínimo, llega de
+> sobra. Es el quinto mínimo del enunciado y `estado_caso/3` ahora lo exige para
+> declarar un caso `completo`.
 
 ### 5.2 Esquema de hechos
 

@@ -27,6 +27,7 @@ def caso(id_, dificultad, estado):
             "evidencias": 10,
             "lugares": 5,
             "declaraciones": 5,
+            "reglas_de_inferencia": 12,
         },
     }
 
@@ -722,6 +723,12 @@ def test_admin_muestra_el_avance_de_los_casos(navegador):
     html = texto(navegador.get("/admin"))
     assert "Avance de los casos" in html
     assert "Caso caso1" in html
+
+
+def test_admin_muestra_las_reglas_de_inferencia_por_caso(navegador):
+    html = texto(navegador.get("/admin"))
+    assert "Reglas" in html
+    assert "12/10" in html
 
 
 def test_admin_lista_las_investigaciones_de_la_sesion(navegador, investigacion):

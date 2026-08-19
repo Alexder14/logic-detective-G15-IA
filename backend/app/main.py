@@ -728,14 +728,19 @@ async def acusar(caso_id: str, acusacion: Acusacion) -> dict[str, Any]:
 
 @app.get("/api/admin/estado", tags=["administración"])
 async def estado_del_proyecto() -> dict[str, Any]:
-    """Estado de los casos contra los mínimos del enunciado, para el módulo
-    administrativo.
+    """Estado de los casos contra los cinco mínimos del enunciado, para el
+    módulo administrativo.
 
-    TODO(backend): contar también las reglas de inferencia propias de cada caso.
+    Las reglas de inferencia propias se agregan acá y no en `/api/casos`: son la
+    única cuenta que exige recorrer las cláusulas de cada caso, y solo esta
+    vista las necesita.
     """
     minimos = consultar("minimos_requeridos(S, E, L, D, R)")
     fila_min = minimos[0] if minimos else {}
     casos = await listar_casos()
+    reglas = {fila["M"]: fila["N"] for fila in consultar("api_reglas_propias(M, N)")}
+    for caso in casos:
+        caso["conteos"]["reglas_de_inferencia"] = reglas.get(caso["id"])
     return {
         "minimos_por_caso": {
             "sospechosos": fila_min.get("S"),
