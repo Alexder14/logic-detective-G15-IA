@@ -90,6 +90,53 @@ def test_no_se_puede_inyectar_prolog_por_la_acusacion(cliente):
     assert respuesta.status_code == 400
 
 
+def test_solo_el_caso_de_referencia_viene_marcado_como_ejemplo(cliente):
+    """caso_demo no cuenta entre los tres entregables y no alcanza los mínimos:
+    el flag es lo que distingue eso de un caso a medio hacer."""
+    casos = {caso["id"]: caso for caso in cliente.get("/api/casos").json()}
+    assert casos["caso_demo"]["es_ejemplo"] is True
+    assert casos["caso_demo"]["estado"] == "incompleto"
+    for caso_id in ("caso1", "caso2", "caso3"):
+        assert casos[caso_id]["es_ejemplo"] is False
+        assert casos[caso_id]["estado"] == "completo"
+    assert cliente.get("/api/casos/caso_demo").json()["es_ejemplo"] is True
+
+
+def test_las_relaciones_marcan_las_conflictivas_y_a_la_victima(cliente):
+    """El enunciado pide poder consultar las relaciones entre las personas."""
+    relaciones = cliente.get("/api/casos/caso1/relaciones").json()
+    assert relaciones, "caso1 declara relaciones entre sus personas"
+    for relacion in relaciones:
+        assert {
+            "persona",
+            "con_quien",
+            "tipo",
+            "es_conflictiva",
+            "es_con_la_victima",
+        } <= set(relacion)
+
+    # heredero es conflictiva: es de donde el motor deduce un motivo.
+    herederos = [r for r in relaciones if r["tipo"] == "heredero"]
+    assert herederos, "caso1 tiene un heredero de la víctima"
+    assert herederos[0]["es_conflictiva"]
+    assert herederos[0]["es_con_la_victima"]
+
+
+def test_las_oportunidades_no_repiten_a_una_persona(cliente):
+    """`tuvo_oportunidad/2` tiene dos cláusulas: la fachada no debe duplicar filas."""
+    oportunidades = cliente.get("/api/casos/caso_demo/oportunidades").json()
+    pares = [(o["persona"], o["lugar"]) for o in oportunidades]
+    assert pares, "caso_demo tiene personas con oportunidad"
+    assert len(pares) == len(set(pares))
+
+
+def test_el_responsable_tuvo_oportunidad(cliente):
+    """Coherencia entre dos deducciones independientes del motor."""
+    conclusion = cliente.get("/api/casos/caso1/conclusion").json()
+    oportunidades = cliente.get("/api/casos/caso1/oportunidades").json()
+    assert conclusion["responsable"] in [o["persona"] for o in oportunidades]
+
+
 def test_admin_reporta_el_avance_contra_los_minimos(cliente):
     estado = cliente.get("/api/admin/estado").json()
     assert estado["minimos_por_caso"]["sospechosos"] == 4
