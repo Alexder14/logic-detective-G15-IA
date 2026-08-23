@@ -49,7 +49,7 @@
 :- ensure_loaded(caso3).
 
 %! version_motor(-Version) is det.
-version_motor('1.0.0-esqueleto').
+version_motor('1.0.0').
 
 %! caso_modulo(?Modulo) is nondet.
 %  Casos cargados, en el orden en que se muestran en la interfaz.

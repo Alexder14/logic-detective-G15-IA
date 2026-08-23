@@ -41,7 +41,7 @@ async def ciclo_de_vida(app: FastAPI):
 app = FastAPI(
     title="Logic Detective API",
     description="Sistema experto de investigación. Motor de inferencia en Prolog.",
-    version="0.1.0-esqueleto",
+    version="1.0.0",
     lifespan=ciclo_de_vida,
 )
 

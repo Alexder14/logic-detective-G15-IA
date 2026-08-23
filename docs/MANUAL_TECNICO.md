@@ -507,6 +507,67 @@ rompe los tres casos a la vez, porque los tres la incluyen.
 Si se empuja de nuevo a la misma rama, la corrida anterior se cancela
 (`concurrency`).
 
+### Despliegue continuo
+
+`.github/workflows/cd.yml` corre cuando entra código a `main`, y también a mano
+desde la pestaña *Actions*. Despliega en la máquina virtual llamando al mismo
+`deploy/desplegar-gcp.sh --actualizar` que se usa en local —para que no existan
+dos procedimientos de despliegue que puedan divergir— y después verifica que la
+interfaz responda.
+
+A diferencia del CI, este flujo **no** cancela la corrida anterior: interrumpir
+un despliegue a la mitad deja los contenedores en cualquier estado.
+
+La autenticación va por **Workload Identity Federation**: GitHub presenta un
+token OIDC de corta vida y GCP se lo cambia por credenciales de la cuenta de
+servicio. No hay ninguna llave guardada en el repositorio —y no podría haberla:
+la organización tiene prohibida la creación de llaves de cuenta de servicio
+(`iam.disableServiceAccountKeyCreation`)—, así que tampoco hay nada que rotar
+ni que se pueda filtrar en un commit.
+
+Configuración, una sola vez:
+
+```bash
+PROY=project-f10908dd-dc93-44b0-952
+NUM=757337981348
+SA=despliegue-ci@$PROY.iam.gserviceaccount.com
+REPO=Alexder14/logic-detective-G15-IA
+
+gcloud services enable iamcredentials.googleapis.com sts.googleapis.com \
+  --project $PROY
+
+# 1. La cuenta de servicio que despliega
+gcloud iam service-accounts create despliegue-ci \
+  --display-name "Despliegue CI de Logic Detective" --project $PROY
+gcloud projects add-iam-policy-binding $PROY \
+  --member "serviceAccount:$SA" --role roles/compute.instanceAdmin.v1
+gcloud projects add-iam-policy-binding $PROY \
+  --member "serviceAccount:$SA" --role roles/iam.serviceAccountUser
+
+# 2. El grupo de identidades federadas y el proveedor de GitHub
+gcloud iam workload-identity-pools create github \
+  --location=global --display-name="GitHub Actions" --project $PROY
+gcloud iam workload-identity-pools providers create-oidc github-oidc \
+  --location=global --workload-identity-pool=github \
+  --display-name="GitHub OIDC" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  --attribute-condition="assertion.repository=='$REPO'" \
+  --issuer-uri="https://token.actions.githubusercontent.com" --project $PROY
+
+# 3. Que solo este repositorio pueda actuar como la cuenta de servicio
+gcloud iam service-accounts add-iam-policy-binding $SA \
+  --role=roles/iam.workloadIdentityUser \
+  --member="principalSet://iam.googleapis.com/projects/$NUM/locations/global/workloadIdentityPools/github/attribute.repository/$REPO" \
+  --project $PROY
+```
+
+La condición sobre `assertion.repository` es importante: sin ella, cualquier
+repositorio de GitHub podría pedir un token para esta cuenta de servicio.
+
+La cuenta necesita `roles/compute.instanceAdmin.v1` para conectarse a la
+instancia y `roles/iam.serviceAccountUser` para actuar como la cuenta de
+servicio de la máquina.
+
 ---
 
 ## 10. Flujo de trabajo con Git
@@ -538,7 +599,30 @@ Etiquetas de versión: `v0.1.0` marca el esqueleto; `v1.0.0`, la entrega final.
 > localmente; falta levantarlo en la máquina virtual. Al completarlo hay que
 > anotar aquí la URL de la instancia.
 
-Procedimiento previsto sobre una VM Ubuntu 22.04 en GCP o AWS:
+El despliegue en GCP está automatizado en `deploy/`:
+
+```bash
+./deploy/desplegar-gcp.sh          # crea la VM, abre el puerto y levanta todo
+./deploy/desplegar-gcp.sh --actualizar   # vuelve a subir el código y reconstruye
+```
+
+`deploy/arranque-vm.sh` es el *startup-script* de la instancia: instala Docker,
+agrega 2 GB de swap —construir la imagen del backend con SWI-Prolog no cabe en
+la memoria de la máquina— y fija la zona horaria. `deploy/desplegar-gcp.sh`
+habilita la API de Compute Engine, crea la VM, abre el 8080, sube el código con
+`git archive` y levanta los contenedores. También administra el ciclo de vida:
+`--actualizar`, `--apagar`, `--encender`, `--eliminar` y `--estado`.
+
+La configuración por omisión es la capa gratuita permanente de GCP: una
+`e2-micro` en `us-central1` con 30 GB de disco `pd-standard`. Lo único
+facturable es la IP externa, alrededor de USD 0.004 por hora.
+
+Requisito previo, y lo único que no automatiza el script: el proyecto de GCP
+necesita una **cuenta de facturación abierta**. Sin ella Google no permite
+habilitar Compute Engine ni crear instancias, ni siquiera dentro de la capa
+gratuita.
+
+Equivalente manual, sobre una VM Ubuntu 22.04 en GCP o AWS:
 
 ```bash
 # 1. En la VM: Docker

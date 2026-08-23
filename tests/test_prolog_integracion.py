@@ -25,7 +25,7 @@ def test_prolog_responde(motor):
 
 def test_la_base_de_conocimiento_esta_cargada(motor):
     """logic_detective.pl expone su versión, así que el archivo se consultó."""
-    assert motor.version() == "1.0.0-esqueleto"
+    assert motor.version() == "1.0.0"
 
 
 def test_los_cuatro_casos_estan_registrados(casos_cargados):

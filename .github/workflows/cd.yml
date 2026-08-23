@@ -1,0 +1,77 @@
+# CD de Logic Detective. Despliega en la máquina virtual de GCP cada vez que
+# entra código a main, de modo que main y lo que está publicado sean siempre lo
+# mismo. También se puede disparar a mano desde la pestaña Actions.
+#
+# La autenticación va por Workload Identity Federation: GitHub presenta un
+# token OIDC de corta vida y GCP se lo cambia por credenciales de la cuenta de
+# servicio de despliegue. No hay ninguna llave guardada en el repositorio, que
+# además es lo único posible acá: la organización tiene prohibida la creación
+# de llaves de cuenta de servicio (iam.disableServiceAccountKeyCreation).
+#
+# Los valores de PROVEEDOR y CUENTA salen de los comandos documentados en el
+# manual técnico, sección 9.
+#
+# El procedimiento es el mismo que corre en local: deploy/desplegar-gcp.sh
+# --actualizar. Así no hay dos formas distintas de desplegar que puedan
+# divergir.
+
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Nunca dos despliegues encima del otro sobre la misma máquina. A diferencia
+# del CI, aquí no se cancela el que va corriendo: interrumpir un despliegue a
+# la mitad deja los contenedores en cualquier estado.
+concurrency:
+  group: cd-produccion
+  cancel-in-progress: false
+
+# id-token: write es lo que habilita a GitHub a pedir el token OIDC con el que
+# se autentica contra Google. Sin este permiso el paso de autenticación falla.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  desplegar:
+    name: Desplegar en la VM
+    runs-on: ubuntu-latest
+
+    env:
+      PROYECTO: ${{ vars.GCP_PROYECTO || 'project-f10908dd-dc93-44b0-952' }}
+      ZONA: us-central1-a
+      INSTANCIA: logic-detective
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Autenticar contra Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.PROYECTO }}
+          workload_identity_provider: >-
+            projects/757337981348/locations/global/workloadIdentityPools/github/providers/github-oidc
+          service_account: despliegue-ci@project-f10908dd-dc93-44b0-952.iam.gserviceaccount.com
+
+      - name: Instalar gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Desplegar
+        run: ./deploy/desplegar-gcp.sh --actualizar
+
+      - name: Verificar que la aplicación responde
+        run: |
+          IP=$(gcloud compute instances describe "$INSTANCIA" \
+                 --zone "$ZONA" --project "$PROYECTO" \
+                 --format 'get(networkInterfaces[0].accessConfigs[0].natIP)')
+          echo "Interfaz publicada en http://$IP:8080"
+          # Reintentos porque el frontend espera a que el backend termine de
+          # cargar la base de conocimiento antes de quedar sano.
+          curl -fsS --retry 10 --retry-delay 6 --retry-connrefused \
+               "http://$IP:8080/salud"
+          echo
+          echo "despliegue verificado" >> "$GITHUB_STEP_SUMMARY"
+          echo "http://$IP:8080" >> "$GITHUB_STEP_SUMMARY"
