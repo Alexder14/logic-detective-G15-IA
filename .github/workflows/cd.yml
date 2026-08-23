@@ -2,11 +2,14 @@
 # entra código a main, de modo que main y lo que está publicado sean siempre lo
 # mismo. También se puede disparar a mano desde la pestaña Actions.
 #
-# Requiere dos cosas configuradas en el repositorio:
+# La autenticación va por Workload Identity Federation: GitHub presenta un
+# token OIDC de corta vida y GCP se lo cambia por credenciales de la cuenta de
+# servicio de despliegue. No hay ninguna llave guardada en el repositorio, que
+# además es lo único posible acá: la organización tiene prohibida la creación
+# de llaves de cuenta de servicio (iam.disableServiceAccountKeyCreation).
 #
-#   secrets.GCP_CREDENCIALES   llave JSON de la cuenta de servicio de despliegue
-#   vars.GCP_PROYECTO          id del proyecto de GCP (opcional, hay un valor
-#                              por omisión más abajo)
+# Los valores de PROVEEDOR y CUENTA salen de los comandos documentados en el
+# manual técnico, sección 9.
 #
 # El procedimiento es el mismo que corre en local: deploy/desplegar-gcp.sh
 # --actualizar. Así no hay dos formas distintas de desplegar que puedan
@@ -26,6 +29,12 @@ concurrency:
   group: cd-produccion
   cancel-in-progress: false
 
+# id-token: write es lo que habilita a GitHub a pedir el token OIDC con el que
+# se autentica contra Google. Sin este permiso el paso de autenticación falla.
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   desplegar:
     name: Desplegar en la VM
@@ -42,7 +51,10 @@ jobs:
       - name: Autenticar contra Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_CREDENCIALES }}
+          project_id: ${{ env.PROYECTO }}
+          workload_identity_provider: >-
+            projects/757337981348/locations/global/workloadIdentityPools/github/providers/github-oidc
+          service_account: despliegue-ci@project-f10908dd-dc93-44b0-952.iam.gserviceaccount.com
 
       - name: Instalar gcloud
         uses: google-github-actions/setup-gcloud@v2

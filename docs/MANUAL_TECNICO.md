@@ -518,16 +518,55 @@ interfaz responda.
 A diferencia del CI, este flujo **no** cancela la corrida anterior: interrumpir
 un despliegue a la mitad deja los contenedores en cualquier estado.
 
-Configuración necesaria en el repositorio:
+La autenticación va por **Workload Identity Federation**: GitHub presenta un
+token OIDC de corta vida y GCP se lo cambia por credenciales de la cuenta de
+servicio. No hay ninguna llave guardada en el repositorio —y no podría haberla:
+la organización tiene prohibida la creación de llaves de cuenta de servicio
+(`iam.disableServiceAccountKeyCreation`)—, así que tampoco hay nada que rotar
+ni que se pueda filtrar en un commit.
 
-| Nombre | Tipo | Contenido |
-| --- | --- | --- |
-| `GCP_CREDENCIALES` | secreto | Llave JSON de la cuenta de servicio de despliegue |
-| `GCP_PROYECTO` | variable | Id del proyecto de GCP (opcional; hay un valor por omisión en el workflow) |
+Configuración, una sola vez:
 
-La cuenta de servicio necesita `roles/compute.instanceAdmin.v1` para poder
-conectarse a la instancia, y `roles/iam.serviceAccountUser` para actuar como la
-cuenta de servicio de la máquina.
+```bash
+PROY=project-f10908dd-dc93-44b0-952
+NUM=757337981348
+SA=despliegue-ci@$PROY.iam.gserviceaccount.com
+REPO=Alexder14/logic-detective-G15-IA
+
+gcloud services enable iamcredentials.googleapis.com sts.googleapis.com \
+  --project $PROY
+
+# 1. La cuenta de servicio que despliega
+gcloud iam service-accounts create despliegue-ci \
+  --display-name "Despliegue CI de Logic Detective" --project $PROY
+gcloud projects add-iam-policy-binding $PROY \
+  --member "serviceAccount:$SA" --role roles/compute.instanceAdmin.v1
+gcloud projects add-iam-policy-binding $PROY \
+  --member "serviceAccount:$SA" --role roles/iam.serviceAccountUser
+
+# 2. El grupo de identidades federadas y el proveedor de GitHub
+gcloud iam workload-identity-pools create github \
+  --location=global --display-name="GitHub Actions" --project $PROY
+gcloud iam workload-identity-pools providers create-oidc github-oidc \
+  --location=global --workload-identity-pool=github \
+  --display-name="GitHub OIDC" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  --attribute-condition="assertion.repository=='$REPO'" \
+  --issuer-uri="https://token.actions.githubusercontent.com" --project $PROY
+
+# 3. Que solo este repositorio pueda actuar como la cuenta de servicio
+gcloud iam service-accounts add-iam-policy-binding $SA \
+  --role=roles/iam.workloadIdentityUser \
+  --member="principalSet://iam.googleapis.com/projects/$NUM/locations/global/workloadIdentityPools/github/attribute.repository/$REPO" \
+  --project $PROY
+```
+
+La condición sobre `assertion.repository` es importante: sin ella, cualquier
+repositorio de GitHub podría pedir un token para esta cuenta de servicio.
+
+La cuenta necesita `roles/compute.instanceAdmin.v1` para conectarse a la
+instancia y `roles/iam.serviceAccountUser` para actuar como la cuenta de
+servicio de la máquina.
 
 ---
 
