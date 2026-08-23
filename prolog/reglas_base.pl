@@ -300,7 +300,10 @@ coartada_invalida(Persona, respaldo_no_confiable(Respaldo)) :-
     \+ respaldo_confiable(Respaldo).
 coartada_invalida(Persona, contradicha_por(Lugar, Hora)) :-
     coartada(Persona, Lugar, Hora, _),
-    coartada_contradicha(Persona, Lugar, Hora).
+    % once/1 porque aqui Lugar y Hora ya estan ligados por coartada/4: basta
+    % con saber que algo contradice esa coartada. Sin el corte, la misma razon
+    % sale repetida una vez por cada hecho que la contradice.
+    once(coartada_contradicha(Persona, Lugar, Hora)).
 
 
 % =============================================================================
