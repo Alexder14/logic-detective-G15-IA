@@ -20,11 +20,14 @@ def test_un_caso_inexistente_da_404(cliente):
     assert cliente.get("/api/casos/no_existe").status_code == 404
 
 
-def test_un_caso_vacio_responde_lista_vacia(cliente):
-    """El caso todavía no tiene hechos, así que no es un error."""
+def test_los_sospechosos_traen_nivel_puntaje_e_indicios(cliente):
+    """Un caso ya poblado devuelve su ranking con la forma que espera la interfaz."""
     respuesta = cliente.get("/api/casos/caso1/sospechosos")
     assert respuesta.status_code == 200
-    assert respuesta.json() == []
+    sospechosos = respuesta.json()
+    assert sospechosos, "caso1 ya tiene hechos: el ranking no puede venir vacío"
+    for sospechoso in sospechosos:
+        assert {"persona", "nivel_sospecha", "puntaje", "indicios"} <= set(sospechoso)
 
 
 def test_sospechosos_vienen_ordenados_por_puntaje(cliente):
@@ -87,8 +90,78 @@ def test_no_se_puede_inyectar_prolog_por_la_acusacion(cliente):
     assert respuesta.status_code == 400
 
 
+def test_solo_el_caso_de_referencia_viene_marcado_como_ejemplo(cliente):
+    """caso_demo no cuenta entre los tres entregables y no alcanza los mínimos:
+    el flag es lo que distingue eso de un caso a medio hacer."""
+    casos = {caso["id"]: caso for caso in cliente.get("/api/casos").json()}
+    assert casos["caso_demo"]["es_ejemplo"] is True
+    assert casos["caso_demo"]["estado"] == "incompleto"
+    for caso_id in ("caso1", "caso2", "caso3"):
+        assert casos[caso_id]["es_ejemplo"] is False
+        assert casos[caso_id]["estado"] == "completo"
+    assert cliente.get("/api/casos/caso_demo").json()["es_ejemplo"] is True
+
+
+def test_las_relaciones_marcan_las_conflictivas_y_a_la_victima(cliente):
+    """El enunciado pide poder consultar las relaciones entre las personas."""
+    relaciones = cliente.get("/api/casos/caso1/relaciones").json()
+    assert relaciones, "caso1 declara relaciones entre sus personas"
+    for relacion in relaciones:
+        assert {
+            "persona",
+            "con_quien",
+            "tipo",
+            "es_conflictiva",
+            "es_con_la_victima",
+        } <= set(relacion)
+
+    # heredero es conflictiva: es de donde el motor deduce un motivo.
+    herederos = [r for r in relaciones if r["tipo"] == "heredero"]
+    assert herederos, "caso1 tiene un heredero de la víctima"
+    assert herederos[0]["es_conflictiva"]
+    assert herederos[0]["es_con_la_victima"]
+
+
+def test_las_oportunidades_no_repiten_a_una_persona(cliente):
+    """`tuvo_oportunidad/2` tiene dos cláusulas: la fachada no debe duplicar filas."""
+    oportunidades = cliente.get("/api/casos/caso_demo/oportunidades").json()
+    pares = [(o["persona"], o["lugar"]) for o in oportunidades]
+    assert pares, "caso_demo tiene personas con oportunidad"
+    assert len(pares) == len(set(pares))
+
+
+def test_el_responsable_tuvo_oportunidad(cliente):
+    """Coherencia entre dos deducciones independientes del motor."""
+    conclusion = cliente.get("/api/casos/caso1/conclusion").json()
+    oportunidades = cliente.get("/api/casos/caso1/oportunidades").json()
+    assert conclusion["responsable"] in [o["persona"] for o in oportunidades]
+
+
 def test_admin_reporta_el_avance_contra_los_minimos(cliente):
     estado = cliente.get("/api/admin/estado").json()
     assert estado["minimos_por_caso"]["sospechosos"] == 4
     assert estado["minimos_por_caso"]["evidencias"] == 10
     assert estado["prolog"]["disponible"] is True
+
+
+def test_admin_cuenta_las_reglas_de_inferencia_de_cada_caso(cliente):
+    """Es el quinto mínimo del enunciado: sin la cuenta no se puede verificar."""
+    estado = cliente.get("/api/admin/estado").json()
+    minimo = estado["minimos_por_caso"]["reglas_de_inferencia"]
+    assert minimo == 10
+
+    reglas = {
+        caso["id"]: caso["conteos"]["reglas_de_inferencia"] for caso in estado["casos"]
+    }
+    for caso_id in ("caso1", "caso2", "caso3"):
+        assert reglas[caso_id] >= minimo, f"{caso_id} no llega a {minimo} reglas"
+    # El de referencia no declara reglas propias: solo usa las compartidas.
+    assert reglas["caso_demo"] == 0
+
+
+def test_un_caso_sin_sus_reglas_propias_no_puede_estar_completo(motor):
+    """Las reglas compartidas de reglas_base.pl no cuentan como propias, así que
+    un caso que solo las use no alcanza el mínimo."""
+    filas = motor.filas("estado_caso(caso_demo, Estado, _)")
+    assert filas[0]["Estado"] == "incompleto"
+    assert motor.filas("reglas_propias(caso_demo, N)")[0]["N"] == 0

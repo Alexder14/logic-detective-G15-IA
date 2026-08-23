@@ -25,7 +25,7 @@ def test_prolog_responde(motor):
 
 def test_la_base_de_conocimiento_esta_cargada(motor):
     """logic_detective.pl expone su versión, así que el archivo se consultó."""
-    assert motor.version() == "1.0.0-esqueleto"
+    assert motor.version() == "1.0.0"
 
 
 def test_los_cuatro_casos_estan_registrados(casos_cargados):
@@ -43,13 +43,14 @@ def test_las_reglas_base_se_cargan_solas(motor):
     assert filas, "reglas_base.pl no se cargó dentro del módulo del caso"
 
 
-def test_un_caso_vacio_falla_sin_lanzar_excepcion(motor):
-    """Un caso sin hechos debe fallar limpio, no explotar.
+def test_una_meta_sin_soluciones_falla_sin_lanzar_excepcion(motor):
+    """Una meta que no tiene respuesta debe fallar limpio, no explotar.
 
-    Es lo que deja a la API en pie mientras caso1/2/3 están vacíos.
+    Es lo que deja a la API en pie cuando la interfaz consulta por alguien que
+    no figura en el caso.
     """
-    assert motor.filas("caso1:responsable(P)") == []
-    assert motor.filas("caso1:sospechoso(P)") == []
+    assert motor.filas("caso1:sospechoso(nadie)") == []
+    assert motor.filas("caso1:responsable(nadie)") == []
 
 
 def test_los_modulos_de_caso_estan_aislados(motor):
@@ -179,24 +180,9 @@ CASOS_DE_PRUEBA = [
         [{"E": "CAMBIAR"}],
         marks=pytest.mark.skip(reason="pendiente: caso2 sin hechos"),
     ),
-    pytest.param(
-        "caso3",
-        "responsable(P)",
-        [{"P": "CAMBIAR"}],
-        marks=pytest.mark.skip(reason="pendiente: caso3 sin hechos"),
-    ),
-    pytest.param(
-        "caso3",
-        "tuvo_oportunidad(CAMBIAR, L)",
-        [{"L": "CAMBIAR"}],
-        marks=pytest.mark.skip(reason="pendiente: caso3 sin hechos"),
-    ),
-    pytest.param(
-        "caso3",
-        "informacion_falsa(P)",
-        [{"P": "CAMBIAR"}],
-        marks=pytest.mark.skip(reason="pendiente: caso3 sin hechos"),
-    ),
+    ("caso3", "responsable(P)", [{"P": "diego_lira"}]),
+    ("caso3", "tuvo_oportunidad(diego_lira, L)", [{"L": "sala_servidores"}]),
+    ("caso3", "informacion_falsa(P)", [{"P": "diego_lira"}]),
 ]
 
 
@@ -207,12 +193,7 @@ def test_caso_de_prueba(motor, caso, meta, esperado):
 
 
 def test_los_tres_casos_cumplen_los_minimos(motor):
-    """Los tres casos deben alcanzar los mínimos del enunciado.
-
-    Quitar el skip cuando estén cargados.
-    """
-    pytest.skip("activar cuando los tres casos estén cargados")
-
+    """Los tres casos deben alcanzar los mínimos del enunciado."""
     for caso in ("caso1", "caso2", "caso3"):
         filas = motor.filas(f"estado_caso({caso}, Estado, _)")
         assert filas[0]["Estado"] == "completo", f"{caso} no cumple los mínimos"

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block titulo %}Informe final — Logic Detective{% endblock %}
+{% block contenido %}
+
+<p class="sin-imprimir">
+  <a href="{{ url_for('investigar_caso', caso_id=caso_id) }}">← Volver a la investigación</a>
+</p>
+
+<h1>Informe final de la investigación</h1>
+<p>
+  {% if caso %}<strong>{{ caso.titulo }}</strong> · {% endif %}
+  <code>{{ informe.caso }}</code>
+  <small>investigación {{ informe.investigacion_id }}</small>
+</p>
+
+<div class="marcador">
+  <div class="marcador-dato">
+    <span class="marcador-n">{{ informe.puntaje_final }}</span>
+    <span class="marcador-etiqueta">puntaje final</span>
+  </div>
+  <div class="marcador-dato">
+    <span class="marcador-n">
+      {{ informe.avance.evidencias_examinadas }}/{{ informe.avance.evidencias_totales }}
+    </span>
+    <span class="marcador-etiqueta">evidencias examinadas</span>
+  </div>
+  <div class="marcador-dato">
+    <span class="marcador-n">
+      {{ informe.avance.declaraciones_interrogadas }}/{{ informe.avance.declaraciones_totales }}
+    </span>
+    <span class="marcador-etiqueta">declaraciones tomadas</span>
+  </div>
+  <div class="marcador-dato">
+    <span class="marcador-n">
+      {{ informe.avance.pistas_usadas }}/{{ informe.avance.pistas_totales }}
+    </span>
+    <span class="marcador-etiqueta">pistas pedidas</span>
+  </div>
+</div>
+
+<section>
+  <h2>Conclusión del motor</h2>
+  {# La justificación que exige la rúbrica: qué reglas se activaron y por qué. #}
+  {% if informe.conclusion.concluye %}
+    <p class="veredicto-final">
+      Responsable: <strong>{{ informe.conclusion.responsable | nombre }}</strong>
+    </p>
+    {% if informe.conclusion.posibles_complices %}
+      <p>
+        Posibles cómplices:
+        {% for p in informe.conclusion.posibles_complices %}
+          {{ p | nombre }}{{ ', ' if not loop.last }}
+        {% endfor %}
+      </p>
+    {% endif %}
+  {% else %}
+    <p class="nota">
+      El motor no reúne elementos suficientes para señalar a un responsable en
+      este caso.
+    </p>
+  {% endif %}
+
+  {% for v in informe.conclusion.veredictos %}
+    <details {{ 'open' if v.veredicto == 'responsable' }}>
+      <summary>
+        {{ v.persona | nombre }} —
+        <span class="etiqueta {{ v.veredicto }}">{{ v.veredicto }}</span>
+        <small>nivel {{ v.nivel_sospecha }}, puntaje {{ v.puntaje }}</small>
+      </summary>
+      {% if v.reglas_activadas %}
+        <ul>
+          {% for r in v.reglas_activadas %}
+            <li><code>{{ r.regla }}</code> → {{ r.detalle }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="nota">Ninguna regla se activó para esta persona.</p>
+      {% endif %}
+    </details>
+  {% endfor %}
+</section>
+
+<section>
+  <h2>Bitácora completa</h2>
+  {% if informe.bitacora %}
+    <ol class="bitacora">
+      {% for a in informe.bitacora %}
+        <li>
+          <span class="hora">{{ a.momento[11:19] }}</span>
+          <span class="etiqueta accion">{{ a.tipo }}</span>
+          {{ a.detalle }}
+        </li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <p class="nota">La investigación se cerró sin ninguna acción registrada.</p>
+  {% endif %}
+</section>
+
+{% endblock %}

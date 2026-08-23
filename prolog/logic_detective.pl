@@ -9,12 +9,16 @@
 
 :- module(logic_detective,
           [ caso_modulo/1,
+            caso_de_ejemplo/1,
             consulta/2,
             estado_caso/3,
+            reglas_propias/2,
             minimos_requeridos/5,
             version_motor/1,
             % fachada plana para el backend (una solucion por fila)
             api_caso/10,
+            api_caso_de_ejemplo/1,
+            api_reglas_propias/2,
             api_sospechoso/4,
             api_indicio/3,
             api_evidencia/7,
@@ -23,6 +27,8 @@
             api_declaracion/4,
             api_coartada/4,
             api_motivo/3,
+            api_relacion/6,
+            api_oportunidad/3,
             api_contradiccion/4,
             api_conclusion/3,
             api_veredicto/5,
@@ -43,7 +49,7 @@
 :- ensure_loaded(caso3).
 
 %! version_motor(-Version) is det.
-version_motor('1.0.0-esqueleto').
+version_motor('1.0.0').
 
 %! caso_modulo(?Modulo) is nondet.
 %  Casos cargados, en el orden en que se muestran en la interfaz.
@@ -53,6 +59,13 @@ caso_modulo(caso_demo).
 caso_modulo(caso1).
 caso_modulo(caso2).
 caso_modulo(caso3).
+
+%! caso_de_ejemplo(?Modulo) is nondet.
+%  Casos que existen como referencia y no cuentan entre los tres entregables.
+%  No tienen que alcanzar los minimos, asi que estado_caso/3 los reporta
+%  incompleto y esta bien: es la unica forma de distinguir "no llega a los
+%  minimos" de "no tiene que llegar".
+caso_de_ejemplo(caso_demo).
 
 %! minimos_requeridos(-Sospechosos, -Evidencias, -Lugares, -Declaraciones, -Reglas) is det.
 %  Minimos por caso segun el enunciado del proyecto.
@@ -81,13 +94,42 @@ consulta(Modulo, Meta) :-
     caso_modulo(Modulo),
     call(Modulo:Meta).
 
+%! reglas_propias(+Modulo, -Cuantas) is det.
+%  Cuantas reglas de inferencia declara el caso por su cuenta, sin contar las
+%  compartidas de reglas_base.pl. Es el quinto minimo del enunciado, el unico
+%  que el modulo administrativo no podia verificar.
+%
+%  Cada caso incluye reglas_base.pl textualmente (:- include), asi que sus
+%  reglas aparecen como definidas en el modulo del caso y no se pueden separar
+%  por el modulo. Lo que si las distingue es el archivo de origen de cada
+%  clausula, que da clause_property/2.
+%
+%  Cuenta predicados, no clausulas: un predicado con tres clausulas es una
+%  regla con tres casos, no tres reglas. Es el criterio mas conservador de los
+%  dos, asi que si este numero alcanza el minimo, alcanza de sobra.
+reglas_propias(Modulo, Cuantas) :-
+    caso_modulo(Modulo),
+    atom_concat(Modulo, '.pl', Archivo),
+    findall(Nombre/Aridad,
+            (   current_predicate(Modulo:Nombre/Aridad),
+                functor(Cabeza, Nombre, Aridad),
+                \+ predicate_property(Modulo:Cabeza, imported_from(_)),
+                catch(clause(Modulo:Cabeza, Cuerpo, Referencia), _, fail),
+                Cuerpo \== true,
+                clause_property(Referencia, file(Origen)),
+                file_base_name(Origen, Archivo)
+            ),
+            Predicados),
+    sort(Predicados, Unicos),
+    length(Unicos, Cuantas).
+
 %! estado_caso(?Modulo, -Estado, -Resumen) is nondet.
 %  Estado = pendiente | incompleto | completo
 %  Resumen = resumen(Sospechosos, Evidencias, Lugares, Declaraciones, Coartadas)
 %
 %  - pendiente:  el archivo aun no tiene hechos.
 %  - incompleto: tiene hechos pero no alcanza los minimos del enunciado.
-%  - completo:   cumple los minimos.
+%  - completo:   cumple los cinco minimos, incluidas las reglas propias.
 %
 %  Esto es lo que el modulo administrativo muestra como avance del proyecto.
 estado_caso(Modulo, Estado, Resumen) :-
@@ -96,11 +138,13 @@ estado_caso(Modulo, Estado, Resumen) :-
     Resumen = resumen(Sospechosos, Evidencias, Lugares, Declaraciones, _),
     (   Sospechosos =:= 0
     ->  Estado = pendiente
-    ;   minimos_requeridos(MinS, MinE, MinL, MinD, _),
+    ;   minimos_requeridos(MinS, MinE, MinL, MinD, MinR),
         Sospechosos >= MinS,
         Evidencias >= MinE,
         Lugares >= MinL,
-        Declaraciones >= MinD
+        Declaraciones >= MinD,
+        reglas_propias(Modulo, Reglas),
+        Reglas >= MinR
     ->  Estado = completo
     ;   Estado = incompleto
     ).
@@ -128,6 +172,18 @@ texto(Termino, Texto) :-
 api_caso(Modulo, Id, Titulo, Descripcion, Dificultad, Estado, NS, NE, NL, ND) :-
     caso_info(Modulo, caso(Id, Titulo, Descripcion, Dificultad)),
     estado_caso(Modulo, Estado, resumen(NS, NE, NL, ND, _)).
+
+%! api_caso_de_ejemplo(?Modulo) is nondet.
+%  Fila por caso de referencia, para que la interfaz pueda decir por que no
+%  alcanza los minimos.
+api_caso_de_ejemplo(Modulo) :-
+    caso_de_ejemplo(Modulo).
+
+%! api_reglas_propias(?Modulo, -Cuantas) is nondet.
+%  Fila por caso con su cuenta de reglas de inferencia propias.
+api_reglas_propias(Modulo, Cuantas) :-
+    caso_modulo(Modulo),
+    reglas_propias(Modulo, Cuantas).
 
 %! api_sospechoso(+Modulo, -Persona, -Nivel, -Puntaje) is nondet.
 %  Ordenados de mayor a menor puntaje por ranking_sospecha/1.
@@ -182,6 +238,31 @@ api_coartada(Modulo, Persona, invalida, Detalle) :-
 api_motivo(Modulo, Persona, Motivo) :-
     consulta(Modulo, tiene_motivo(Persona, Termino)),
     texto(Termino, Motivo).
+
+%! api_relacion(+Modulo, -Persona, -ConQuien, -Tipo, -Conflictiva, -ConLaVictima) is nondet.
+%  Los vinculos entre las personas del caso, tal como estan declarados en
+%  relacion/3. Conflictiva = si | no segun relacion_conflictiva/1: es lo que
+%  usa tiene_motivo/2 para deducir un motivo cuando no esta declarado, asi que
+%  la interfaz puede mostrar por que una relacion pesa. ConLaVictima = si | no
+%  ahorra tener que cruzar victima/1 aparte.
+api_relacion(Modulo, Persona, ConQuien, Tipo, Conflictiva, ConLaVictima) :-
+    consulta(Modulo, relacion(Persona, ConQuien, Tipo)),
+    (   consulta(Modulo, relacion_conflictiva(Tipo))
+    ->  Conflictiva = si
+    ;   Conflictiva = no
+    ),
+    (   consulta(Modulo, victima(ConQuien))
+    ->  ConLaVictima = si
+    ;   ConLaVictima = no
+    ).
+
+%! api_oportunidad(+Modulo, -Persona, -Lugar) is nondet.
+%  Quien pudo cometer el incidente: estuvo o pudo estar en la escena y no tiene
+%  una coartada que lo descarte. setof/3 para no repetir una persona cuando las
+%  dos clausulas de tuvo_oportunidad/2 se cumplen por caminos distintos.
+api_oportunidad(Modulo, Persona, Lugar) :-
+    setof(P-L, consulta(Modulo, tuvo_oportunidad(P, L)), Pares),
+    member(Persona-Lugar, Pares).
 
 %! api_contradiccion(+Modulo, -Tipo, -A, -B) is nondet.
 %  Tipo = entre_declaraciones | declaracion_vs_evidencia.

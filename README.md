@@ -39,7 +39,7 @@ logic-detective-G15-IA/
 │   └── Dockerfile
 ├── frontend/                   # Interfaz web (2 módulos)
 │   ├── app.py                  # Servidor Flask
-│   ├── templates/              # base, inicio, investigacion, caso, admin
+│   ├── templates/              # base, inicio, investigacion, caso, informe, admin
 │   ├── static/estilos.css
 │   ├── requirements.txt
 │   └── Dockerfile
@@ -125,9 +125,8 @@ ruff check . && ruff format --check .
 
 **Si te toca el backend (`backend/app/main.py`)**
 
-Buscá los `TODO(backend)`. Los endpoints ya consultan Prolog; lo que falta es la
-capa de encima: descubrimiento progresivo de la información, bitácora de
-investigación e informe final del caso.
+El descubrimiento progresivo, la bitácora y el informe final ya están; lo que
+queda son los `TODO(backend)`, que son detalles de eficiencia.
 
 Si necesitás un dato que Prolog no expone, agregá un predicado `api_*` plano en
 `prolog/logic_detective.pl`. No desarmes términos de Prolog en Python ni metas
@@ -135,12 +134,14 @@ decisiones en Python.
 
 **Si te toca la interfaz (`frontend/`)**
 
-Buscá los `TODO(interfaz)`. Falta el flujo de acciones de investigación en
-`caso.html`, la bitácora y el historial en `admin.html`, y el diseño.
+El flujo de investigación está completo: expediente cerrado, acciones que
+revelan la información de a una, pistas con costo, bitácora, acusación e informe
+final. Antes de tocar `caso.html` leé la sección 4.5 del manual técnico: explica
+por qué los análisis son enlaces aparte y por qué de lo no descubierto solo
+viaja el id al HTML. Si rompés eso, se rompe el descubrimiento progresivo aunque
+la página siga cargando.
 
-Estas dos partes van de la mano: el flujo de acciones y la bitácora necesitan
-endpoints nuevos. Acuerden la forma de esos endpoints entre backend e interfaz
-**antes** de empezar a programarlos, o uno va a quedar esperando al otro.
+Falta el manual de usuario con capturas y el despliegue.
 
 **Reglas base (`prolog/reglas_base.pl`)**
 
@@ -154,23 +155,24 @@ Dos ramas fijas y una rama por tarea:
 ```
 main        entregable estable. Solo recibe merges desde develop.
 develop     integración. Aquí se juntan los aportes de todos.
-feat/...    una rama por tarea, sale de develop y vuelve por pull request.
+feature/... una rama por tarea, sale de develop y vuelve por pull request.
 ```
 
-Nombres de rama sugeridos, uno por responsabilidad:
+Una rama por responsabilidad, con el nombre `feature/<carné>-<tema>`:
 
 ```
-feat/caso1        feat/caso2        feat/caso3
-feat/backend      feat/interfaz     docs/manuales
+feature/202100039-caso1-prolog     feature/199622440-caso2-prolog
+feature/201708845-caso3-prolog     feature/201700312-backend
+feature/201020600-interfaz
 ```
 
 **Cómo trabajar tu parte**
 
 ```bash
 git switch develop && git pull
-git switch -c feat/caso1          # tu rama
+git switch -c feature/202100039-caso1-prolog   # tu rama
 # ... trabajás y hacés tus commits ...
-git push -u origin feat/caso1     # abrís el pull request hacia develop
+git push -u origin feature/202100039-caso1-prolog   # y abrís el PR hacia develop
 ```
 
 Trabajá siempre en tu rama, nunca directo en `main`. Como cada caso es un
@@ -213,25 +215,26 @@ Grupo 15. Coordinador: Henrry Omar Martínez Charuc.
 
 | | Carné | Integrante | Rol |
 | --- | --- | --- | --- |
-| P1 | 201708845 | Joshua Estuardo Franco Equite | Prolog — Caso 1 |
-| P2 | 201700312 | Aybson Diddiere Mercado Grijalva | Prolog — Caso 2 |
-| P3 | 202100039 | Madeline Fabiola Prado Reyes | Prolog — Caso 3 |
-| P4 | 9622440 | Henrry Omar Martínez Charuc | Backend Python + integración PySwip. Coordinación |
+| P1 | 202100039 | Madeline Fabiola Prado Reyes | Prolog — Caso 1 |
+| P2 | 199622440 | Henrry Omar Martínez Charuc | Prolog — Caso 2 |
+| P3 | 201708845 | Joshua Estuardo Franco Equite | Prolog — Caso 3 + los 10 casos de prueba |
+| P4 | 201700312 | Aybson Diddiere Mercado Grijalva | Backend Python + integración PySwip |
 | P5 | 201020600 | Pedro Alexander Salazar Pocasangre | Interfaz + Docker/CI-CD/Despliegue |
 
-Los 10 casos de prueba los escribe el dueño de cada caso: tres cada uno, ya
-repartidos en la plantilla de `tests/test_prolog_integracion.py`.
+Los 10 casos de prueba los arma P3, sobre la plantilla de
+`tests/test_prolog_integracion.py`.
 
 El cronograma semana a semana y los porcentajes están en
 [`docs/DISTRIBUCION_TRABAJO.md`](docs/DISTRIBUCION_TRABAJO.md).
 
 ## Estado
 
-Listo y funcionando: la estructura, las reglas base en Prolog, el backend con
-PySwip, el esqueleto de la interfaz con sus dos módulos, los contenedores y el
-CI. Todo el camino interfaz -> backend -> Prolog está probado de punta a punta.
+Listo y funcionando: la estructura, las reglas base, **los tres casos completos**
+en Prolog, el backend con PySwip —descubrimiento progresivo, bitácora e informe
+final del caso—, la interfaz completa con su flujo de investigación y su diseño,
+los contenedores y el CI. Todo el camino interfaz -> backend -> Prolog está
+probado de punta a punta.
 
-Pendiente: los tres casos de investigación, los 10 casos de prueba, el
-descubrimiento progresivo de la información, la bitácora, el informe final del
-caso, el diseño visual, la documentación y el despliegue en la VM. Los `TODO` en
-el código marcan cada cosa.
+Pendiente: los 10 casos de prueba (6 filas siguen con `skip` en
+`tests/test_prolog_integracion.py`, esperando la respuesta esperada de los casos
+1 y 2), el manual de usuario con capturas y el despliegue en la nube.
