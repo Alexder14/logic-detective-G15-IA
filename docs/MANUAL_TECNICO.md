@@ -507,6 +507,28 @@ rompe los tres casos a la vez, porque los tres la incluyen.
 Si se empuja de nuevo a la misma rama, la corrida anterior se cancela
 (`concurrency`).
 
+### Despliegue continuo
+
+`.github/workflows/cd.yml` corre cuando entra código a `main`, y también a mano
+desde la pestaña *Actions*. Despliega en la máquina virtual llamando al mismo
+`deploy/desplegar-gcp.sh --actualizar` que se usa en local —para que no existan
+dos procedimientos de despliegue que puedan divergir— y después verifica que la
+interfaz responda.
+
+A diferencia del CI, este flujo **no** cancela la corrida anterior: interrumpir
+un despliegue a la mitad deja los contenedores en cualquier estado.
+
+Configuración necesaria en el repositorio:
+
+| Nombre | Tipo | Contenido |
+| --- | --- | --- |
+| `GCP_CREDENCIALES` | secreto | Llave JSON de la cuenta de servicio de despliegue |
+| `GCP_PROYECTO` | variable | Id del proyecto de GCP (opcional; hay un valor por omisión en el workflow) |
+
+La cuenta de servicio necesita `roles/compute.instanceAdmin.v1` para poder
+conectarse a la instancia, y `roles/iam.serviceAccountUser` para actuar como la
+cuenta de servicio de la máquina.
+
 ---
 
 ## 10. Flujo de trabajo con Git
