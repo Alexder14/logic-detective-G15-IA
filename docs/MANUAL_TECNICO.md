@@ -538,7 +538,30 @@ Etiquetas de versión: `v0.1.0` marca el esqueleto; `v1.0.0`, la entrega final.
 > localmente; falta levantarlo en la máquina virtual. Al completarlo hay que
 > anotar aquí la URL de la instancia.
 
-Procedimiento previsto sobre una VM Ubuntu 22.04 en GCP o AWS:
+El despliegue en GCP está automatizado en `deploy/`:
+
+```bash
+./deploy/desplegar-gcp.sh          # crea la VM, abre el puerto y levanta todo
+./deploy/desplegar-gcp.sh --actualizar   # vuelve a subir el código y reconstruye
+```
+
+`deploy/arranque-vm.sh` es el *startup-script* de la instancia: instala Docker,
+agrega 2 GB de swap —construir la imagen del backend con SWI-Prolog no cabe en
+la memoria de la máquina— y fija la zona horaria. `deploy/desplegar-gcp.sh`
+habilita la API de Compute Engine, crea la VM, abre el 8080, sube el código con
+`git archive` y levanta los contenedores. También administra el ciclo de vida:
+`--actualizar`, `--apagar`, `--encender`, `--eliminar` y `--estado`.
+
+La configuración por omisión es la capa gratuita permanente de GCP: una
+`e2-micro` en `us-central1` con 30 GB de disco `pd-standard`. Lo único
+facturable es la IP externa, alrededor de USD 0.004 por hora.
+
+Requisito previo, y lo único que no automatiza el script: el proyecto de GCP
+necesita una **cuenta de facturación abierta**. Sin ella Google no permite
+habilitar Compute Engine ni crear instancias, ni siquiera dentro de la capa
+gratuita.
+
+Equivalente manual, sobre una VM Ubuntu 22.04 en GCP o AWS:
 
 ```bash
 # 1. En la VM: Docker
