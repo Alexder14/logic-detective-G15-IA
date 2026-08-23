@@ -138,14 +138,19 @@ fi
 paso "Subiendo el código"
 PAQUETE="$(mktemp /tmp/logic-detective-XXXX.tar.gz)"
 git -C "$RAIZ" archive --format=tar.gz HEAD > "$PAQUETE"
-gcp compute scp "$PAQUETE" "$INSTANCIA:/tmp/logic-detective.tar.gz" --zone "$ZONA" --quiet
+# El destino va al home del usuario que se conecta y no a /tmp: cada quien
+# entra a la VM con un usuario distinto —el de cada persona, y otro para la
+# cuenta de servicio del CI— y /tmp tiene sticky bit, asi que el segundo en
+# desplegar no puede sobrescribir el paquete del primero.
+gcp compute scp "$PAQUETE" "$INSTANCIA:logic-detective.tar.gz" --zone "$ZONA" --quiet
 rm -f "$PAQUETE"
 
 paso "Construyendo y levantando (en e2-micro el build tarda ~10 min)"
 gcp compute ssh "$INSTANCIA" --zone "$ZONA" --quiet --command '
 set -euo pipefail
 sudo mkdir -p /opt/logic-detective
-sudo tar xzf /tmp/logic-detective.tar.gz -C /opt/logic-detective
+sudo tar xzf "$HOME/logic-detective.tar.gz" -C /opt/logic-detective
+rm -f "$HOME/logic-detective.tar.gz"
 cd /opt/logic-detective
 
 # Clave de sesión propia del despliegue. Se genera una sola vez y se conserva
