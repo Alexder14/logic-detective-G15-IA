@@ -380,9 +380,7 @@ swipl prolog/logic_detective.pl
 ?- caso_demo:ranking_sospecha(R).
 ```
 
-
-
-### 5.6 Las reglas propias del caso 1
+### 5.5 Las reglas propias del caso 1
 
 El caso 1 ("El Collar Estelar") agrega diez reglas propias sobre los
 predicados de `reglas_base.pl`, sin duplicar su lógica:
@@ -432,6 +430,53 @@ Montes tiene motivo pero ni oportunidad ni medios; Hugo Paredes tiene acceso
 pero ni motivo ni evidencia directa. Ninguno reúne las cinco condiciones a la
 vez, así que `responsable/1` converge en una sola persona.
 
+### 5.6 Las reglas propias del caso 3
+
+El caso 3, **«El servidor saboteado»** (`prolog/caso3.pl`), es un sabotaje al
+servidor principal de NexaCorp durante la ventana de mantenimiento nocturna.
+Sobre los predicados compartidos de la sección 5.3 agrega sus propias reglas de
+inferencia: `reglas_propias/2` le cuenta 11 predicados propios, sobre el mínimo
+de 10 que exige `estado_caso/3`.
+
+| Predicado | Qué infiere |
+| --- | --- |
+| `turno_nocturno/1` | Quién estuvo activo —visto o con acceso registrado— entre 0 y 4 h, la ventana sin vigilancia que dejó el mantenimiento |
+| `credenciales_privilegiadas/1` | Quién pudo operar la consola sin ayuda: llave física de la sala o conocimiento técnico |
+| `unico_con_llave_de_la_escena/1` | Que nadie más tiene llave de la escena (lista + negación: si apareciera un segundo, deja de cumplirse para ambos) |
+| `evidencia_fisica_y_digital/1` | Quién acumula evidencia física (huella o video) **y** digital (bitácora) a la vez; más exigente que `evidencias_contra/2` |
+| `vinculado_con/2` | Cierre transitivo de `relacion_bidireccional/3` **sin pasar por la víctima** (recursivo, con lista de visitados para no ciclar) |
+| `complice_potencial/1` | Vinculado con el sospechoso principal y además activo en la franja nocturna |
+| `perfil_atacante/2` | Clasifica según el modus operandi (`experto_con_oportunidad`, `con_acceso_pero_cubierto`, `sin_credenciales`); los cortes dejan una sola clase por consulta |
+| `evidencias_directas_del_caso/2` | Cuántas evidencias directas (huella, adn, video, registro) hay contra alguien |
+| `unica_actividad_nocturna/1` | Toda la actividad conocida de esa persona cae dentro de la franja de riesgo (negación pura) |
+| `resumen_investigativo/2` | Banderas agregadas para el módulo administrativo: nocturno, credenciales, única llave y conteo de evidencias directas |
+
+Consultas de referencia, contra el caso ya cargado:
+
+```bash
+swipl prolog/logic_detective.pl
+?- caso3:responsable(P).
+%@ P = diego_lira ;
+%@ false
+?- caso3:ranking_sospecha(R).
+%@ R = [sospecha(18, diego_lira, muy_alto),
+%@      sospecha(4, renata_soto, medio),
+%@      sospecha(1, bruno_paredes, bajo),
+%@      sospecha(0, ana_lucero, nulo)]
+?- caso3:perfil_atacante(P, X).
+%@ P = diego_lira, X = experto_con_oportunidad
+?- caso3:resumen_investigativo(diego_lira, R).
+%@ R = resumen_investigativo(diego_lira, si, si, si, 3)
+```
+
+Por qué el motor concluye un único responsable: `diego_lira` concentra
+oportunidad (turno nocturno + registro de acceso a las 1 h), motivo (contrato
+marcado como «no renovar»), medios (es el único con llave de la sala de
+servidores), coartada inválida (negó estar en la escena y lo contradicen la
+huella, el video del pasillo y la bitácora) y tres evidencias directas. Los
+distractores quedan abajo sin empatar: `renata_soto` llega a medio por la deuda
+y el vínculo, `bruno_paredes` a bajo por su ronda nocturna, y `ana_lucero`
+queda nula.
 
 ---
 
