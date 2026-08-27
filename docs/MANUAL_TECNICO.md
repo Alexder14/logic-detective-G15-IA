@@ -380,6 +380,59 @@ swipl prolog/logic_detective.pl
 ?- caso_demo:ranking_sospecha(R).
 ```
 
+
+
+### 5.6 Las reglas propias del caso 1
+
+El caso 1 ("El Collar Estelar") agrega diez reglas propias sobre los
+predicados de `reglas_base.pl`, sin duplicar su lógica:
+
+| Predicado | Qué infiere |
+| --- | --- |
+| `hizo_ronda_de_vigilancia/1` | Si la persona fue vista en las tres áreas de la ronda de seguridad esa noche |
+| `desactivo_la_alarma/1` | Combina que la persona tenga el código de alarma como medio y que exista evidencia de tipo registro que la incrimine |
+| `cadena_de_confianza/3` | Ruta recursiva sobre `relacion/3`, evitando pasar por la víctima, para rastrear vínculos de confianza entre personas |
+| `pudo_pasar_la_joya/1` | A partir del responsable, quién más pudo haber recibido el collar según la cadena de confianza |
+| `acceso_privilegiado/1` | Si la persona tiene acceso a tres o más de las cinco zonas del evento |
+| `coartada_totalmente_sola/1` | Si la coartada de la persona no tiene respaldo y nadie más fue visto en ese lugar y hora que pudiera corroborarla |
+| `unico_con_medios_y_oportunidad/1` | Si la persona es la única que reúne oportunidad y medios a la vez |
+| `nivel_riesgo_joya/2` | Clasifica a la persona en alto, medio o bajo, combinando acceso privilegiado y evidencia directa |
+| `acusacion_formal_procede/1` | Si existen al menos dos evidencias directas contra la persona |
+| `no_es_sospechoso_creible/1` | Descarta a quien tuvo acceso pero no tiene motivo ni evidencia directa en contra |
+| `ladron_del_collar/1` | Conclusión propia del caso: reúne desactivó la alarma, hizo la ronda, coartada sin respaldo y acusación formal, confirmando que nadie más cumple todas las condiciones a la vez |
+
+Consultas de referencia, verificadas contra el motor:
+
+```prolog
+?- caso1:responsable(P).
+P = victor_cordero.
+
+?- caso1:ladron_del_collar(P).
+P = victor_cordero.
+
+?- caso1:ranking_sospecha(R).
+R = [sospecha(18, victor_cordero, muy_alto),
+     sospecha(4, valeria_montes, medio),
+     sospecha(3, hugo_paredes, bajo),
+     sospecha(2, isabela_duarte, bajo)].
+
+?- caso1:contradicciones(C).
+C = [declaracion_vs_evidencia(d1,e1), declaracion_vs_evidencia(d1,e3),
+     entre_declaraciones(d1,d2)].
+```
+
+**Por qué el motor no empata entre sospechosos.** Víctor Cordero acumula las
+cinco condiciones que exige `responsable/1`: tuvo oportunidad (fue visto en la
+escena a la hora del robo), motivo (deudas de juego), medios (código de alarma
+y llave del gabinete de seguridad), una coartada sin ningún respaldo, y al
+menos dos evidencias directas en su contra (huella, video de la cámara de
+respaldo y el registro de la alarma). Los otros tres sospechosos quedan por
+debajo a propósito: Isabela Duarte tiene motivo pero coartada válida; Valeria
+Montes tiene motivo pero ni oportunidad ni medios; Hugo Paredes tiene acceso
+pero ni motivo ni evidencia directa. Ninguno reúne las cinco condiciones a la
+vez, así que `responsable/1` converge en una sola persona.
+
+
 ---
 
 ## 6. Cómo agregar un caso nuevo
