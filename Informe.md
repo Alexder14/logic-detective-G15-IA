@@ -22,7 +22,7 @@ De acuerdo con los requerimientos normativos del curso, la suma total de partici
 | 202100039 | **Madeline Fabiola Prado Reyes** | MadelinePrado | Prolog / Caso 1 | Modelo lógico del Caso 1, base de hechos, dieciséis reglas de inferencia propias y consultas de solución. | 20.0% |
 | 199622440 | **Henrry Omar Martínez Charuc** | henrrymartinez | Prolog / Caso 2 y coordinación | Modelo lógico del Caso 2, evidencias, declaraciones, diez reglas de inferencia propias y consultas asociadas. Coordinación del grupo e informe de participación. | 20.0% |
 | 201708845 | **Joshua Estuardo Franco Equite** | JoshF8 | Prolog / Caso 3 y QA | Modelo lógico del Caso 3 con once reglas propias, diseño y ejecución de los 10 casos de prueba del curso. | 20.0% |
-| 201700312 | **Aybson Diddiere Mercado Grijalva** | Aybson Mercado | Backend Python & PySwip | API REST en FastAPI, integración con PySwip, descubrimiento progresivo, bitácora e informe final del caso. | 20.0% |
+| 201700312 | **Aybson Diddiere Mercado Grijalva** | gtcaps | Backend Python & PySwip | API REST en FastAPI, integración con PySwip, descubrimiento progresivo, bitácora e informe final del caso. | 20.0% |
 | 201020600 | **Pedro Alexander Salazar Pocasangre** | Alexder14 | Interfaz, DevOps y despliegue | Interfaz web en Flask + Jinja2, reglas base en Prolog, Docker Compose, CI/CD en GitHub Actions y despliegue en GCP. | 20.0% |
 
 ---
