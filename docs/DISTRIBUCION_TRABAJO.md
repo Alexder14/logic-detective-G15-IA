@@ -89,9 +89,14 @@ Los porcentajes deben sumar 100 % y estar respaldados por commits.
 | 202100039 | Madeline Fabiola Prado Reyes | Caso 1 en Prolog y su sección del manual técnico | MadelinePrado | 20 % |
 | 199622440 | Henrry Omar Martínez Charuc | Caso 2 en Prolog y su sección del manual técnico. Coordinación del grupo e informe de participación | henrrymartinez | 20 % |
 | 201708845 | Joshua Estuardo Franco Equite | Caso 3 en Prolog, los 10 casos de prueba y su sección del manual técnico | JoshF8 | 20 % |
-| 201700312 | Aybson Diddiere Mercado Grijalva | Backend: descubrimiento progresivo, bitácora e informe final del caso. Pruebas de la API | | 20 % |
+| 201700312 | Aybson Diddiere Mercado Grijalva | Backend: descubrimiento progresivo, bitácora e informe final del caso. Pruebas de la API | gtcaps | 20 % |
 | 201020600 | Pedro Alexander Salazar Pocasangre | Estructura del repositorio, reglas base en Prolog, integración con PySwip, interfaz completa, Docker, CI/CD, despliegue y documentación | Alexder14 | 20 % |
 | | | | **TOTAL** | **100 %** |
+
+P4 aparece en el historial con dos identidades de Git: `Aybson Mercado
+<aybsonmg@gmail.com>`, que es la de su cuenta de GitHub `gtcaps`, y
+`MERCADO GRIJALVA, AYBSON DIDDIERE <amercado+progreso@cempro.com>`, que es la
+de la máquina donde trabajó. Los dos commits son suyos.
 
 ## Evidencias de respaldo
 
