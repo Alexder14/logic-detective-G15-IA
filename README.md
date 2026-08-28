@@ -6,6 +6,8 @@ Prolog (SWI-Prolog) y se integra con una aplicación Python usando PySwip.
 Proyecto 1 de Inteligencia Artificial 1, Facultad de Ingeniería, USAC,
 segundo semestre 2026.
 
+**Sistema desplegado:** http://34.121.98.65:8080 (VM de GCP)
+
 ## Arquitectura
 
 ```
@@ -141,7 +143,8 @@ por qué los análisis son enlaces aparte y por qué de lo no descubierto solo
 viaja el id al HTML. Si rompés eso, se rompe el descubrimiento progresivo aunque
 la página siga cargando.
 
-Falta el manual de usuario con capturas y el despliegue.
+El manual de usuario con capturas está en [`docs/MANUAL_USUARIO.md`](docs/MANUAL_USUARIO.md)
+y el sistema ya está desplegado en la VM de GCP.
 
 **Reglas base (`prolog/reglas_base.pl`)**
 
@@ -229,12 +232,26 @@ El cronograma semana a semana y los porcentajes están en
 
 ## Estado
 
-Listo y funcionando: la estructura, las reglas base, **los tres casos completos**
-en Prolog, el backend con PySwip —descubrimiento progresivo, bitácora e informe
-final del caso—, la interfaz completa con su flujo de investigación y su diseño,
-los contenedores y el CI. Todo el camino interfaz -> backend -> Prolog está
-probado de punta a punta.
+Entrega completa. Todo lo que pide el enunciado está implementado, probado y
+desplegado:
 
-Pendiente: los 10 casos de prueba (6 filas siguen con `skip` en
-`tests/test_prolog_integracion.py`, esperando la respuesta esperada de los casos
-1 y 2), el manual de usuario con capturas y el despliegue en la nube.
+| Requisito | Dónde está |
+| --- | --- |
+| Tres casos en Prolog con los mínimos (4 sospechosos, 10 evidencias, 5 lugares, 5 declaraciones, 10 reglas propias) | `prolog/caso1.pl`, `caso2.pl`, `caso3.pl` |
+| Interfaz funcional: módulo de investigación y módulo administrativo | `frontend/` |
+| Integración Python ↔ Prolog vía PySwip | `backend/app/prolog_engine.py` |
+| Los 10 casos de prueba del curso | `tests/test_prolog_integracion.py` |
+| Contenedores y CI/CD | `docker-compose.yml`, `.github/workflows/` |
+| Despliegue en la nube | VM de GCP — **http://34.121.98.65:8080** |
+| Documentación | `docs/` — manual técnico, manual de usuario y arquitectura |
+
+Los conteos por caso salen del propio motor:
+
+```
+caso1  resumen(4,10,5,5,4)  16 reglas propias  responsable: victor_cordero
+caso2  resumen(4,10,5,6,4)  10 reglas propias  responsable: carlos
+caso3  resumen(4,10,5,5,4)  11 reglas propias  responsable: diego_lira
+```
+
+La suite completa —122 pruebas entre Prolog, API e interfaz— pasa con
+`pytest -q`, y `ruff check . && ruff format --check .` sale limpio.

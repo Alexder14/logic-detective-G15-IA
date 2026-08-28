@@ -143,43 +143,13 @@ def test_responsable_es_una_sola_respuesta(motor):
 CASOS_DE_PRUEBA = [
     # 1 — RESUELTO, sirve de ejemplo del formato.
     ("caso_demo", "responsable(P)", [{"P": "bruno"}]),
-    # 2 a 10 — pendientes, uno por consulta evaluada del enunciado.
-    pytest.param(
-        "caso1",
-        "responsable(P)",
-        [{"P": "CAMBIAR"}],
-        marks=pytest.mark.skip(reason="pendiente: caso1 sin hechos"),
-    ),
-    pytest.param(
-        "caso1",
-        "sospechoso_principal(P)",
-        [{"P": "CAMBIAR"}],
-        marks=pytest.mark.skip(reason="pendiente: caso1 sin hechos"),
-    ),
-    pytest.param(
-        "caso1",
-        "nivel_sospecha(CAMBIAR, N)",
-        [{"N": "muy_alto"}],
-        marks=pytest.mark.skip(reason="pendiente: caso1 sin hechos"),
-    ),
-    pytest.param(
-        "caso2",
-        "responsable(P)",
-        [{"P": "CAMBIAR"}],
-        marks=pytest.mark.skip(reason="pendiente: caso2 sin hechos"),
-    ),
-    pytest.param(
-        "caso2",
-        "coartada_invalida(CAMBIAR, R)",
-        [{"R": "CAMBIAR"}],
-        marks=pytest.mark.skip(reason="pendiente: caso2 sin hechos"),
-    ),
-    pytest.param(
-        "caso2",
-        "declaracion_contradice_evidencia(CAMBIAR, E)",
-        [{"E": "CAMBIAR"}],
-        marks=pytest.mark.skip(reason="pendiente: caso2 sin hechos"),
-    ),
+    # 2 a 10 — uno por consulta evaluada del enunciado.
+    ("caso1", "responsable(P)", [{"P": "victor_cordero"}]),
+    ("caso1", "sospechoso_principal(P)", [{"P": "victor_cordero"}]),
+    ("caso1", "nivel_sospecha(victor_cordero, N)", [{"N": "muy_alto"}]),
+    ("caso2", "responsable(P)", [{"P": "carlos"}]),
+    ("caso2", "coartada_invalida(roberto, R)", [{"R": "sin_respaldo"}]),
+    ("caso2", "declaracion_contradice_evidencia(dec6, E)", [{"E": "ev9"}]),
     ("caso3", "responsable(P)", [{"P": "diego_lira"}]),
     ("caso3", "tuvo_oportunidad(diego_lira, L)", [{"L": "sala_servidores"}]),
     ("caso3", "informacion_falsa(P)", [{"P": "diego_lira"}]),
