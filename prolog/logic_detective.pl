@@ -35,7 +35,22 @@
             api_explicacion/4,
             api_evento/4,
             api_pista/2,
-            api_acusacion/4
+            api_acusacion/4,
+            % modulo administrativo: alta/baja de casos y lectura de hechos crudos
+            registrar_caso/1,
+            olvidar_caso/1,
+            vaciar_caso/1,
+            api_admin_persona/3,
+            api_admin_evidencia/6,
+            api_admin_lugar/3,
+            api_admin_conexion/3,
+            api_admin_coartada/5,
+            api_admin_motivo/3,
+            api_admin_oportunidad/5,
+            api_admin_relacion/4,
+            api_admin_declaracion/5,
+            api_admin_ficha/3,
+            api_admin_hechos/3
           ]).
 
 :- use_module(library(lists)).
@@ -55,6 +70,11 @@ version_motor('1.0.0').
 %  Casos cargados, en el orden en que se muestran en la interfaz.
 %  caso_demo va primero porque es el unico que responde mientras los otros
 %  tres esten vacios.
+%
+%  Dinamico porque el modulo administrativo da de alta y de baja casos con el
+%  motor ya corriendo. Las cuatro clausulas de aqui son el catalogo de fabrica.
+:- dynamic caso_modulo/1.
+
 caso_modulo(caso_demo).
 caso_modulo(caso1).
 caso_modulo(caso2).
@@ -330,3 +350,137 @@ api_acusacion(Modulo, Acusado, Veredicto, Responsable) :-
         )
     ;   Veredicto = indeterminada, Responsable = ninguno
     ).
+
+
+% =============================================================================
+%  FACHADA DEL MODULO ADMINISTRATIVO
+% =============================================================================
+%  Las api_* de arriba entregan lo que el motor DEDUJO; estas, los hechos tal
+%  como estan escritos, porque solo se puede editar lo que alguien declaro: un
+%  motivo derivado de una relacion conflictiva no se puede borrar, el motivo/2
+%  declarado si.
+%
+%  El alta y la baja las hace el backend con assertz/retract sobre Modulo:Hecho,
+%  que funciona porque reglas_base.pl declara dinamico todo el esquema.
+
+%! hecho_del_esquema(?Nombre/?Aridad) is nondet.
+%  El esquema que documenta la cabecera de reglas_base.pl, como datos.
+hecho_del_esquema(caso/4).
+hecho_del_esquema(sospechoso/1).
+hecho_del_esquema(testigo/1).
+hecho_del_esquema(victima/1).
+hecho_del_esquema(relacion/3).
+hecho_del_esquema(lugar/2).
+hecho_del_esquema(escena_del_incidente/1).
+hecho_del_esquema(hora_del_incidente/1).
+hecho_del_esquema(lugar_conectado/2).
+hecho_del_esquema(tiene_llave/2).
+hecho_del_esquema(autorizado_en/2).
+hecho_del_esquema(registro_acceso/3).
+hecho_del_esquema(visto_en/3).
+hecho_del_esquema(motivo/2).
+hecho_del_esquema(medio_requerido/1).
+hecho_del_esquema(posee_medio/2).
+hecho_del_esquema(evidencia/5).
+hecho_del_esquema(evidencia_incrimina/2).
+hecho_del_esquema(declaracion/3).
+hecho_del_esquema(coartada/4).
+
+%! registrar_caso(+Modulo) is det.
+%  Suma un caso al catalogo. Idempotente, a diferencia de un assertz suelto.
+registrar_caso(Modulo) :-
+    (   caso_modulo(Modulo)
+    ->  true
+    ;   assertz(caso_modulo(Modulo))
+    ).
+
+%! olvidar_caso(+Modulo) is det.
+%  Saca el caso del catalogo. El modulo sigue cargado -- SWI no descarga uno
+%  incluido -- pero deja de existir para consulta/2 y para el usuario.
+olvidar_caso(Modulo) :-
+    retractall(caso_modulo(Modulo)).
+
+%! vaciar_caso(+Modulo) is det.
+%  Borra los hechos del caso sin tocar sus reglas, para que uno nuevo con el
+%  mismo nombre no herede los del anterior.
+vaciar_caso(Modulo) :-
+    forall(hecho_del_esquema(Nombre/Aridad),
+           (   functor(Cabeza, Nombre, Aridad),
+               retractall(Modulo:Cabeza)
+           )).
+
+%! api_admin_persona(+Modulo, -Persona, -Rol) is nondet.
+%  Rol = sospechoso | testigo | victima. Puede aparecer con mas de uno si el
+%  caso la declaro asi: el administrador ve los hechos como estan.
+api_admin_persona(Modulo, Persona, sospechoso) :-
+    consulta(Modulo, sospechoso(Persona)).
+api_admin_persona(Modulo, Persona, testigo) :-
+    consulta(Modulo, testigo(Persona)).
+api_admin_persona(Modulo, Persona, victima) :-
+    consulta(Modulo, victima(Persona)).
+
+%! api_admin_evidencia(+Modulo, -Id, -Tipo, -Lugar, -Hora, -Descripcion) is nondet.
+api_admin_evidencia(Modulo, Id, Tipo, Lugar, Hora, Descripcion) :-
+    consulta(Modulo, evidencia(Id, Tipo, Lugar, Hora, Descripcion)).
+
+%! api_admin_lugar(+Modulo, -Nombre, -Descripcion) is nondet.
+api_admin_lugar(Modulo, Nombre, Descripcion) :-
+    consulta(Modulo, lugar(Nombre, Descripcion)).
+
+%! api_admin_conexion(+Modulo, -Desde, -Hasta) is nondet.
+api_admin_conexion(Modulo, Desde, Hasta) :-
+    consulta(Modulo, lugar_conectado(Desde, Hasta)).
+
+%! api_admin_coartada(+Modulo, -Persona, -Lugar, -Hora, -Respaldo) is nondet.
+%  La coartada declarada, sin evaluar. Respaldo llega como cadena por ser un
+%  termino compuesto: "testigo(bruno_salcedo)".
+api_admin_coartada(Modulo, Persona, Lugar, Hora, Respaldo) :-
+    consulta(Modulo, coartada(Persona, Lugar, Hora, Termino)),
+    texto(Termino, Respaldo).
+
+%! api_admin_motivo(+Modulo, -Persona, -Tipo) is nondet.
+api_admin_motivo(Modulo, Persona, Tipo) :-
+    consulta(Modulo, motivo(Persona, Tipo)).
+
+%! api_admin_relacion(+Modulo, -Persona, -ConQuien, -Tipo) is nondet.
+api_admin_relacion(Modulo, Persona, ConQuien, Tipo) :-
+    consulta(Modulo, relacion(Persona, ConQuien, Tipo)).
+
+%! api_admin_declaracion(+Modulo, -Id, -Autor, -Funtor, -Contenido) is nondet.
+%  Funtor va aparte del texto completo para que la interfaz elija el formulario
+%  sin volver a parsear la cadena.
+api_admin_declaracion(Modulo, Id, Autor, Funtor, Contenido) :-
+    consulta(Modulo, declaracion(Id, Autor, Termino)),
+    functor(Termino, Funtor, _),
+    texto(Termino, Contenido).
+
+%! api_admin_oportunidad(+Modulo, -Tipo, -Persona, -Objeto, -Hora) is nondet.
+%  Los cinco hechos con los que reglas_base.pl deduce tuvo_oportunidad/2 y
+%  capacidad/2. Hora = entero | sin_hora: tres de ellos no llevan hora.
+api_admin_oportunidad(Modulo, visto_en, Persona, Lugar, Hora) :-
+    consulta(Modulo, visto_en(Persona, Lugar, Hora)).
+api_admin_oportunidad(Modulo, registro_acceso, Persona, Lugar, Hora) :-
+    consulta(Modulo, registro_acceso(Persona, Lugar, Hora)).
+api_admin_oportunidad(Modulo, tiene_llave, Persona, Lugar, sin_hora) :-
+    consulta(Modulo, tiene_llave(Persona, Lugar)).
+api_admin_oportunidad(Modulo, autorizado_en, Persona, Lugar, sin_hora) :-
+    consulta(Modulo, autorizado_en(Persona, Lugar)).
+api_admin_oportunidad(Modulo, posee_medio, Persona, Medio, sin_hora) :-
+    consulta(Modulo, posee_medio(Persona, Medio)).
+
+%! api_admin_ficha(+Modulo, -Clave, -Valor) is nondet.
+%  Los hechos sueltos que configuran el caso: escena, hora y medios exigidos.
+api_admin_ficha(Modulo, escena_del_incidente, Lugar) :-
+    consulta(Modulo, escena_del_incidente(Lugar)).
+api_admin_ficha(Modulo, hora_del_incidente, Hora) :-
+    consulta(Modulo, hora_del_incidente(Hora)).
+api_admin_ficha(Modulo, medio_requerido, Medio) :-
+    consulta(Modulo, medio_requerido(Medio)).
+
+%! api_admin_hechos(+Modulo, +Patron, -Texto) is nondet.
+%  Una fila por hecho que unifica con Patron, ya citado y por lo tanto releible.
+%  Es lo que permite deshacer una baja: antes de retirar un hecho se guarda su
+%  texto, y para restaurarlo se vuelve a afirmar.
+api_admin_hechos(Modulo, Patron, Texto) :-
+    call(Modulo:Patron),
+    texto(Patron, Texto).

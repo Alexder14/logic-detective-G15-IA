@@ -26,6 +26,15 @@ services:
     environment:
       # Zona horaria de Guatemala, para que los logs cuadren.
       TZ: America/Guatemala
+      # Dónde persiste el módulo administrativo su bitácora de cambios y los
+      # casos creados desde la interfaz.
+      LD_DATOS: /app/datos
+    volumes:
+      # El único estado que el contenedor no puede reconstruir solo: sin este
+      # volumen, un `docker compose down` borraría lo que se haya dado de alta
+      # desde administración. La base de conocimiento de fábrica sí viaja en la
+      # imagen, así que el volumen guarda únicamente los cambios.
+      - datos-administracion:/app/datos
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
@@ -61,3 +70,9 @@ services:
       timeout: 5s
       start_period: 10s
       retries: 5
+
+
+volumes:
+  datos-administracion:
+    # Cambios del módulo administrativo. `docker compose down -v` lo borra y
+    # deja los casos como salen de sus archivos .pl.

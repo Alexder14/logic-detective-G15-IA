@@ -628,3 +628,99 @@ h2 small { font-weight: 400; color: var(--suave); }
   details { break-inside: avoid; }
   details[open] > summary ~ * { display: block; }
 }
+
+/* ------------------------------------------------- módulo administrativo */
+/* Ocho entidades con el mismo formulario: una tabla, un alta y una edición en
+ * línea. Los estilos son genéricos por la misma razón que la plantilla lo es:
+ * agregar una entidad no debería pedir CSS nuevo. */
+
+.migas { margin: 0 0 0.75rem; font-size: 0.9rem; }
+
+.panel-admin {
+  padding: 1.25rem 1.35rem;
+  margin: 1.5rem 0;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+}
+.panel-admin > h2 { margin-top: 0; }
+
+.detalle-entidad {
+  margin: -0.25rem 0 1rem;
+  color: var(--suave);
+  font-size: 0.92rem;
+  max-width: 60ch;
+}
+
+/* Las tablas de administración tienen más columnas que las de investigación:
+ * se desplazan solas en vez de desbordar la página. */
+.tabla-scroll { overflow-x: auto; }
+.tabla-scroll table { margin-bottom: 0.75rem; }
+
+.rejilla-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.9rem 1.1rem;
+  margin-bottom: 0.9rem;
+}
+.rejilla-campos > div { display: flex; flex-direction: column; gap: 0.3rem; }
+.rejilla-campos label { font-size: 0.9rem; font-weight: 500; }
+.rejilla-campos input, .rejilla-campos select { width: 100%; }
+.rejilla-campos .nota { font-size: 0.8rem; margin: 0; }
+
+form textarea {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio-chico);
+  margin-bottom: 0.9rem;
+}
+
+.campo-multiple {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  padding: 0.6rem 0.8rem;
+  margin: 0 0 0.9rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+  background: var(--superficie-2);
+}
+.campo-multiple legend { font-size: 0.9rem; font-weight: 500; padding: 0 0.3rem; }
+.campo-multiple .nota { flex-basis: 100%; margin: 0.2rem 0 0; font-size: 0.8rem; }
+.campo-multiple input[type="text"] { flex: 1 1 8rem; min-width: 7rem; }
+
+.campo-casilla {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+.campo-casilla input { width: auto; }
+
+/* Editar y eliminar conviven en la misma celda: el formulario de baja no
+ * puede romper la línea, de ahí el bloque en línea. */
+.acciones-fila { white-space: nowrap; }
+.acciones-fila > * { vertical-align: middle; }
+.en-linea { display: inline; }
+.acciones-fila .en-linea button { margin-left: 0.5rem; }
+
+form button.peligro {
+  background: var(--alerta);
+  border-color: var(--alerta);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+}
+form button.peligro:hover { background: #8f212c; border-color: #8f212c; }
+
+.fila-en-edicion { background: var(--acento-claro); }
+.fila-en-edicion td { padding: 1rem; }
+
+details.alta { margin-top: 0.5rem; }
+details.alta summary { color: var(--acento); }

@@ -76,7 +76,7 @@ BACKEND_URL=http://localhost:8000 python frontend/app.py
 
 ```bash
 curl -s localhost:8000/health
-# {"estado":"ok","prolog":"conectado","version_motor":"1.0.0-esqueleto", ...}
+# {"estado":"ok","prolog":"conectado","version_motor":"1.0.0", ...}
 
 curl -s localhost:8080/salud
 # {"estado":"ok","backend":"http://localhost:8000"}
@@ -94,6 +94,7 @@ contenedor en lugar de que muera al arrancar.
 | `SECRET_KEY` | interfaz | `logic-detective-dev` | **Cambiar en el despliegue.** Firma la sesión de Flask |
 | `PORT` | interfaz | `8080` | |
 | `TZ` | ambos | `America/Guatemala` | Para que los logs cuadren con la hora local |
+| `LD_DATOS` | backend | `<raíz>/datos` | Dónde persiste el módulo administrativo. En Compose es `/app/datos`, montado como volumen |
 
 ---
 
@@ -110,6 +111,27 @@ contenedor en lugar de que muera al arrancar.
 Regla de diseño que atraviesa todo el proyecto: **toda deducción ocurre en
 Prolog.** Python orquesta, traduce y presenta. Si aparece un `if` en Python que
 decide quién es culpable, esa lógica está en el lugar equivocado.
+
+El módulo administrativo agrega la flecha que falta: además de consultar el
+motor, lo **escribe**.
+
+```
+                         ┌──────────────────────────────────────────┐
+                         │                backend                   │
+   /investigacion  ──►   │  main.py      lee    ──► filas()         │  ──►  ┌─────────┐
+                         │                                          │       │ Prolog  │
+   /admin          ──►   │  admin_api.py escribe ──► afirmar()      │  ──►  │ en      │
+                         │       │                   retirar()      │       │ memoria │
+                         │       ▼                                  │       └─────────┘
+                         │  administracion.py ──► datos/administracion.json
+                         └──────────────────────────────────────────┘
+                                        │
+                            al arrancar, se vuelve a aplicar
+```
+
+Los dos módulos trabajan sobre **la misma base de conocimiento en memoria**, y
+por eso un alta desde administración se ve en la consulta siguiente de la
+investigación. El detalle de cómo y por qué está en la sección 5.7.
 
 Recorrido de una consulta, por ejemplo `GET /api/casos/caso_demo/conclusion`:
 
@@ -132,14 +154,23 @@ logic-detective-G15-IA/
 │   ├── caso_demo.pl            Caso mínimo de referencia
 │   └── caso1.pl caso2.pl caso3.pl
 ├── backend/
-│   ├── app/main.py             Endpoints FastAPI
+│   ├── app/main.py             Endpoints de investigación (FastAPI)
+│   ├── app/admin_api.py        Endpoints del módulo administrativo (CRUD)
+│   ├── app/administracion.py   Bitácora de cambios y su persistencia en JSON
+│   ├── app/terminos.py         Construcción y validación de términos de Prolog
+│   ├── app/investigaciones.py  Descubrimiento progresivo y bitácora del detective
+│   ├── app/comun.py            Utilidades compartidas por los dos módulos
 │   ├── app/prolog_engine.py    ÚNICO punto de contacto con PySwip
 │   └── Dockerfile
 ├── frontend/
 │   ├── app.py                  Servidor Flask
-│   ├── templates/              base, inicio, investigacion, caso, informe, admin
+│   ├── templates/              base, inicio, investigacion, caso, informe,
+│   │                           admin, admin_caso
 │   ├── static/estilos.css
 │   └── Dockerfile
+├── datos/                      Estado del módulo administrativo (no versionado)
+│   ├── administracion.json     Bitácora de cambios
+│   └── casos/                  Módulos .pl de los casos creados desde la interfaz
 ├── tests/
 ├── docs/
 ├── .github/workflows/ci.yml
@@ -176,6 +207,34 @@ Prolog:
 | `GET /api/casos/{id}/conclusion` | `api_conclusion/3`, `api_veredicto/5`, `api_explicacion/4` | Responsable, cómplices y **reglas activadas** |
 | `POST /api/casos/{id}/acusacion` | `api_acusacion/4` | Veredicto de la acusación |
 | `GET /api/admin/estado` | `api_caso/10`, `estado_caso/3`, `api_reglas_propias/2` | Avance de los casos contra los cinco mínimos, reglas de inferencia incluidas |
+
+El módulo administrativo agrega su propio grupo de rutas bajo `/api/admin`. A
+diferencia de las anteriores, estas **escriben** en la base de conocimiento; la
+sección 5.7 explica cómo. Todas las de un caso viven bajo
+`/api/admin/casos/{caso}` y siguen el mismo patrón REST.
+
+| Método y ruta | Escribe | Notas |
+| --- | --- | --- |
+| `GET /api/admin/esquema` | — | El vocabulario del esquema (dificultades, roles, tipos de relación, motivo, evidencia, declaración, respaldo y oportunidad). La interfaz arma sus desplegables con esto |
+| `GET /api/admin/historial` | — | Bitácora de cambios administrativos, la más reciente primero |
+| `POST /api/admin/restaurar` | varias | Deshace todos los cambios y vuelve al estado de fábrica |
+| `GET POST /api/admin/casos` | `caso/4` | Listar y crear casos. Crear uno genera además su módulo de Prolog |
+| `GET PUT DELETE /api/admin/casos/{caso}` | `caso/4`, `caso_modulo/1` | Ficha del caso; la baja lo saca del catálogo |
+| `PUT /api/admin/casos/{caso}/ficha` | `escena_del_incidente/1`, `hora_del_incidente/1`, `medio_requerido/1` | Los tres hechos sueltos que configuran el caso |
+| `GET POST /…/personas` · `PUT DELETE /…/personas/{nombre}` | `sospechoso/1`, `testigo/1`, `victima/1` | La baja arrastra todo lo que colgaba de la persona |
+| `GET POST /…/evidencias` · `PUT DELETE /…/evidencias/{id}` | `evidencia/5`, `evidencia_incrimina/2` | |
+| `GET POST /…/lugares` · `PUT DELETE /…/lugares/{nombre}` | `lugar/2`, `escena_del_incidente/1`, `lugar_conectado/2` | |
+| `GET POST /…/declaraciones` · `PUT DELETE /…/declaraciones/{id}` | `declaracion/3` | El contenido se arma desde `tipo` + `argumentos` |
+| `GET POST /…/relaciones` · `PUT DELETE /…/relaciones/{persona}/{con_quien}` | `relacion/3` | |
+| `GET POST /…/coartadas` · `PUT DELETE /…/coartadas/{persona}` | `coartada/4` | El listado trae además el veredicto de `coartada_valida/2` |
+| `GET POST /…/motivos` · `PUT DELETE /…/motivos/{persona}/{tipo}` | `motivo/2` | Solo los motivos **declarados**; los derivados no se pueden borrar |
+| `GET POST DELETE /…/oportunidades` | `visto_en/3`, `registro_acceso/3`, `tiene_llave/2`, `autorizado_en/2`, `posee_medio/2` | La baja lleva su clave en la query string: estos hechos no tienen identificador propio |
+
+La lectura de estos endpoints no usa los `api_*` de la investigación sino los
+`api_admin_*`, que devuelven **los hechos como están escritos** y no lo que el
+motor dedujo de ellos. La diferencia importa: `api_motivo/3` mezcla el motivo
+declarado con el que sale de una relación conflictiva, y solo el primero se
+puede editar.
 
 Los endpoints del descubrimiento progresivo y la bitácora. Una **investigación**
 es una partida sobre un caso: vive en la memoria del backend
@@ -232,6 +291,34 @@ Sin esa validación un parámetro como `caso1), halt, foo(` se ejecutaría como
 código Prolog: es una inyección equivalente a un SQL injection. Hay pruebas
 específicas para esto en `tests/test_api.py`.
 
+El módulo administrativo lleva el mismo problema más lejos, porque no interpola
+identificadores sino registros enteros, con descripciones libres. Todo lo que
+termina dentro de un término pasa por `backend/app/terminos.py`, que es la única
+forma de construir uno:
+
+| Función | Qué garantiza |
+| --- | --- |
+| `atomo(valor, campo)` | Es un identificador de Prolog: `^[a-z][a-zA-Z0-9_]{0,63}$` |
+| `texto(valor, campo)` | Devuelve el valor citado, con la comilla simple duplicada y la barra invertida escapada — igual que como escribe SWI-Prolog sus propios átomos, así que se vuelve a leer idéntico |
+| `hora(valor, campo)` | Entero 0..23, y `desconocida` solo donde el esquema lo admite |
+| `uno_de(valor, campo, opciones)` | El valor está en el vocabulario de `reglas_base.pl` |
+| `hecho(nombre, *args)` | Arma el término a partir de argumentos **ya validados** |
+
+Encima de eso, `admin_api.py` comprueba la integridad referencial contra la base
+de conocimiento: que el autor de una declaración sea alguien del caso, que el
+lugar de una evidencia exista, que no se repita un identificador. El motor no
+exige nada de esto —`declaracion(d9, fantasma, posee(fantasma, llave))` se
+afirma sin protestar y después no deduce nada—, y ese silencio es peor que un
+error, porque parece que funciona.
+
+Los errores de validación levantan `ValorInvalido`, que un único manejador
+registrado en `main.py` traduce a un `400` con el campo culpable:
+
+```json
+{"detail": "hora: debe estar entre 0 y 23 (recibido: 99)",
+ "campo": "hora", "motivo": "debe estar entre 0 y 23 (recibido: 99)"}
+```
+
 ### 4.4 Rutas de la interfaz
 
 | Ruta | Método | Descripción |
@@ -246,8 +333,26 @@ específicas para esto en `tests/test_api.py`.
 | `/investigacion/<caso>/pista` | POST | Pide la próxima pista |
 | `/investigacion/<caso>/acusacion` | POST | Acusación final |
 | `/investigacion/<caso>/informe` | GET | Informe final de la investigación |
-| `/admin` | GET | Avance de los casos y las investigaciones de la sesión |
+| `/admin` | GET | Tablero: casos, alta de casos, cambios administrativos e investigaciones de la sesión |
+| `/admin/casos` | POST | Crea un caso y redirige a su editor |
+| `/admin/casos/<caso>` | GET | Editor del caso: sus ocho entidades. Acepta `?editar=<entidad>:<clave>` |
+| `/admin/casos/<caso>/ficha` | POST | Guarda la ficha del caso y sus tres hechos de configuración |
+| `/admin/casos/<caso>/eliminar` | POST | Saca el caso del catálogo |
+| `/admin/casos/<caso>/<entidad>/crear` | POST | Alta en cualquiera de las ocho entidades |
+| `/admin/casos/<caso>/<entidad>/editar` | POST | Modificación |
+| `/admin/casos/<caso>/<entidad>/eliminar` | POST | Baja |
+| `/admin/restaurar` | POST | Deshace todos los cambios administrativos |
 | `/salud` | GET | Healthcheck del contenedor |
+
+Las tres rutas genéricas de `<entidad>` no son ocho copias del mismo formulario:
+las ocho entidades están descritas como datos en `ENTIDADES` (`frontend/app.py`)
+—sus campos, sus tipos, qué las identifica— y una sola plantilla
+(`admin_caso.html`) las recorre. Agregar una novena entidad es agregar una
+entrada a ese diccionario.
+
+La fila que se está editando la decide el servidor con `?editar=`, sin
+JavaScript: la pantalla funciona con scripts deshabilitados y no hay estado
+duplicado entre cliente y servidor.
 
 ### 4.5 Descubrimiento progresivo en la interfaz
 
@@ -480,6 +585,90 @@ queda nula.
 
 ---
 
+### 5.7 Cómo el módulo administrativo escribe en la base de conocimiento
+
+Es la parte menos obvia del proyecto. Vale la pena entenderla antes de tocar
+`administracion.py`.
+
+**El problema.** Los hechos de los tres casos viven en archivos `.pl` escritos a
+mano, con sus reglas al lado. Si el administrador editara esos archivos, cada
+alta tendría que reescribir código fuente y recargar el motor, y un error de
+formato dejaría el proyecto sin arrancar.
+
+**Lo que lo hace posible.** `reglas_base.pl` declara `dynamic` todo el esquema
+de hechos, y cada caso la incluye **antes** de sus propios hechos:
+
+```prolog
+:- module(caso1, []).
+:- include('reglas_base.pl').   % acá se declaran dynamic sospechoso/1, evidencia/5, ...
+sospechoso(victor_cordero).     % ...así que estas cláusulas son dinámicas
+```
+
+Eso significa que el motor acepta `assertz` y `retract` sobre los hechos de un
+caso ya cargado. No hubo que refactorizar nada: la declaración estaba puesta
+desde el principio para que un caso vacío no diera `existence_error`.
+
+**La bitácora.** El motor se carga siempre igual, desde los `.pl` de fábrica, y
+encima se aplican las operaciones que el administrador fue haciendo:
+
+```
+alta   →  assertz(caso1:(motivo(valeria_montes,dinero)))
+baja   →  retractall(caso1:(evidencia(e1,_,_,_,_)))
+```
+
+Esa lista se guarda en `datos/administracion.json`. Al arrancar, la API vuelve a
+aplicarla en orden sobre el motor recién cargado, así que un contenedor
+reiniciado reconstruye exactamente el mismo estado. Es lo que hace que los
+cambios persistan sin tocar los `.pl`.
+
+**Por qué las bajas usan `retractall` con comodines.** Modificar la evidencia
+`e1` es retirar `evidencia(e1,_,_,_,_)` y afirmar la nueva. Con comodines, la
+baja no depende de reconstruir exactamente los otros cuatro campos del hecho
+viejo; y `retractall` en vez de `retract` porque no debe fallar si el hecho ya
+no está, que es lo que hace idempotente volver a aplicar la bitácora.
+
+**Cómo se deshace.** Antes de retirar nada, la baja pregunta qué se va a llevar:
+
+```prolog
+api_admin_hechos(Modulo, Patron, Texto) :-
+    call(Modulo:Patron),
+    texto(Patron, Texto).        % term_string/2: sale citado y se relee igual
+```
+
+y guarda ese texto en la operación. Restaurar es recorrer la bitácora al revés
+aplicando el inverso de cada paso: un alta se retira, y una baja se repone
+afirmando lo que había guardado. Sin ese paso, eliminar sería irreversible y el
+botón de restaurar no podría existir.
+
+**Los casos creados desde la interfaz.** Las reglas de `reglas_base.pl` se
+incluyen por módulo, así que un caso nuevo necesita el suyo. Se genera un `.pl`
+mínimo en `datos/casos/` y se consulta al arrancar:
+
+```prolog
+:- module(caso4, []).
+:- include('/app/prolog/reglas_base.pl').
+caso(caso4, 'El robo del archivo', 'Desaparece un expediente…', media).
+```
+
+Después `registrar_caso/1` lo suma a `caso_modulo/1` —que es `dynamic` por esto
+mismo— y sus hechos entran por la misma bitácora que los de los casos de
+fábrica. El caso hereda las reglas compartidas: apenas tiene personas y hechos,
+`ranking_sospecha/1`, `veredicto/2` y `explicacion/2` funcionan sobre él. Lo que
+no hereda son reglas *propias*, y por eso `estado_caso/3` lo reporta incompleto
+hasta que alguien se las escriba.
+
+**Eliminar un caso.** Uno de fábrica solo sale de `caso_modulo/1`: sus hechos
+siguen en memoria, intactos, y restaurar lo devuelve entero. Uno creado desde la
+interfaz se borra de verdad —hechos, archivo generado y sus operaciones en la
+bitácora—, porque no hay ningún estado de fábrica al que volver.
+
+**Concurrencia.** `AlmacenAdministracion` serializa sus escrituras con un
+candado, igual que `MotorProlog` serializa sus consultas y
+`AlmacenInvestigaciones` su diccionario. SWI-Prolog no es seguro para llamadas
+concurrentes desde varios hilos, y acá además se escribe un archivo.
+
+---
+
 ## 6. Cómo agregar un caso nuevo
 
 1. **Crear el archivo** `prolog/caso4.pl` partiendo de `prolog/caso_demo.pl`,
@@ -510,6 +699,13 @@ queda nula.
 No hace falta tocar Python ni la interfaz: el caso aparece solo en el listado y
 en el módulo administrativo.
 
+**La otra vía: crearlo desde la interfaz.** El módulo administrativo crea casos
+sin escribir un archivo a mano (sección 5.7). La diferencia está en las reglas:
+un caso creado así hereda las compartidas de `reglas_base.pl` y deduce desde el
+primer hecho, pero no tiene reglas *propias*, y el enunciado pide diez por caso.
+Sirve para cargar un caso rápido o para preparar una demostración; para un caso
+entregable hay que escribir su `.pl` igual.
+
 **Mínimos por caso que exige el enunciado:** 4 sospechosos, 10 evidencias,
 5 lugares, 5 declaraciones y 10 reglas de inferencia propias. Mientras no se
 cumplan, el caso se muestra como `incompleto`.
@@ -539,6 +735,8 @@ ruff check . && ruff format --check .  # lint y formato
 | `tests/test_api.py` | Endpoints de principio a fin: FastAPI → PySwip → Prolog. Incluye intentos de inyección | Sí |
 | `tests/test_prolog_integracion.py` | Reglas de inferencia y los 10 casos de prueba del enunciado | Sí |
 | `tests/test_frontend.py` | Capa de presentación: filtros, rutas y plantillas, con el backend simulado | No |
+| `tests/test_investigaciones.py` | Descubrimiento progresivo, puntaje y bitácora | Sí |
+| `tests/test_admin.py` | CRUD del módulo administrativo, validaciones, persistencia y su efecto sobre la deducción. Incluye las funciones puras de `terminos.py` | Sí |
 
 `tests/conftest.py` inicializa **una sola instancia** de SWI-Prolog por sesión
 (fixture `motor`, alcance `session`): PySwip arranca una única máquina Prolog
@@ -547,6 +745,16 @@ dentro del proceso y reinicializarla en cada prueba es lento y frágil.
 La interfaz se carga con `importlib` bajo el nombre `interfaz_web`, porque
 `frontend/app.py` y el paquete `backend/app/` competirían por el nombre `app` en
 `sys.modules`.
+
+`conftest.py` apunta además `LD_DATOS` a un directorio temporal **antes** de
+cualquier import de `app.*`, porque `administracion.py` lo resuelve al
+importarse. Sin eso, una corrida de las pruebas escribiría en los datos reales
+del proyecto y dejaría cambios administrativos aplicados de verdad.
+
+Como el motor es de sesión y lo comparten todas las pruebas, las de
+`test_admin.py` deshacen lo suyo con `POST /api/admin/restaurar` (fixture
+`base_limpia`): si no, una prueba que agrega un sospechoso al caso 1 rompería
+las de `test_api.py` que cuentan sus sospechosos.
 
 Los 10 casos de prueba del enunciado están como plantilla con `skip`. Cada
 responsable de caso activa los suyos quitando el `skip` correspondiente. La meta
@@ -584,6 +792,21 @@ Dos decisiones que conviene no revertir sin entender por qué están:
 En Compose, la interfaz espera a que el backend esté **sano** (`condition:
 service_healthy`), no solo arrancado: cargar la base de conocimiento toma un
 momento.
+
+**El volumen `datos-administracion`** guarda lo único que el contenedor no puede
+reconstruir solo: la bitácora de cambios del módulo administrativo y los casos
+creados desde la interfaz. La base de conocimiento de fábrica viaja en la imagen,
+así que el volumen contiene únicamente los cambios.
+
+```bash
+docker compose down      # conserva los cambios administrativos
+docker compose down -v   # los borra: los casos vuelven a como salen de sus .pl
+```
+
+El directorio `/app/datos` se crea en la imagen y se le da al usuario
+`detective` **antes** de que se monte el volumen. Docker copia el dueño del
+directorio de la imagen al inicializar un volumen con nombre; si no existiera, lo
+crearía como `root` y el contenedor no podría escribirlo.
 
 ---
 

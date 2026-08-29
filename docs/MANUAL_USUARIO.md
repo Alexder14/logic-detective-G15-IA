@@ -24,7 +24,7 @@ La pantalla de inicio muestra:
 - El nombre y el propósito del sistema.
 - Los casos de investigación disponibles, con su dificultad y su estado.
 - **Iniciar una investigación**, que lleva al listado de casos.
-- **Módulo administrativo**, para ver el estado interno del sistema.
+- **Módulo administrativo**, para crear y editar los casos y todo su contenido.
 
 ### Los casos disponibles
 
@@ -153,19 +153,133 @@ Contiene:
 
 ## 3. Módulo administrativo
 
-Se entra desde **Administración**, en la barra superior.
+Se entra desde **Administración**, en la barra superior. Acá se edita lo que el
+detective investiga: los casos y todo lo que contienen.
 
 ![Módulo administrativo](imagenes/05-admin.png)
 
-Muestra:
+El tablero muestra:
 
 - **El estado del motor Prolog**: si la aplicación tiene la base de conocimiento
   cargada y respondiendo.
-- **El avance de cada caso** contra los mínimos del proyecto: sospechosos,
+- **Los casos**, con su avance contra los mínimos del proyecto: sospechosos,
   evidencias, lugares, declaraciones y reglas de inferencia propias. Un caso
-  queda **COMPLETO** solo si cumple los cinco.
+  queda **COMPLETO** solo si cumple los cinco. Cada uno tiene su botón
+  **Administrar** y su botón **Eliminar**.
+- **Crear un caso**, para dar de alta uno nuevo.
+- **Los cambios administrativos** hechos hasta ahora y el botón para deshacerlos
+  todos.
 - **Las investigaciones de esta sesión**, con su puntaje, sus acciones y un
   enlace al informe de cada una.
+
+> **Lo que se cambia acá se ve al instante en la investigación.** No hay dos
+> copias de los datos: administración escribe en la misma base de conocimiento
+> que el motor consulta. Si le agregás un motivo a un sospechoso, en la
+> siguiente consulta del detective ese motivo ya pesa en su nivel de sospecha.
+
+### 3.1 Crear un caso
+
+En el tablero, abrí **Crear un caso** y completá:
+
+| Campo | Qué va | Ejemplo |
+| --- | --- | --- |
+| Identificador | minúsculas, dígitos y guion bajo, sin espacios ni acentos | `caso4` |
+| Título | el nombre que verá el detective | `El robo del archivo` |
+| Dificultad | fácil, media o difícil | `media` |
+| Descripción | qué pasó, en una o dos frases | `Desaparece un expediente…` |
+
+Al guardarlo, el sistema lleva directo a su editor. El caso nace vacío y con las
+reglas de inferencia compartidas ya cargadas: apenas tenga personas y hechos, el
+motor empieza a deducir sobre él.
+
+### 3.2 Editar un caso
+
+El botón **Administrar** abre el editor, con todo el caso en una sola pantalla.
+
+![Editor de un caso](imagenes/10-admin-caso.png)
+
+Arriba está la **ficha del caso**: título, dificultad, descripción, cuál es la
+escena del incidente, a qué hora ocurrió y qué medios exigió (una llave, el
+código de la alarma, conocimiento técnico…). Estos tres últimos son los que más
+pesan: sin escena nadie pudo tener oportunidad, y sin medio requerido nadie pudo
+tener capacidad.
+
+Debajo, una sección por cada cosa que el caso contiene:
+
+| Sección | Qué se registra |
+| --- | --- |
+| **Personas** | Sospechosos, testigos y la víctima. El rol decide quién entra al ranking de sospecha. |
+| **Lugares** | Los sitios del caso, cuál es la escena y qué lugares conectan entre sí. |
+| **Evidencias** | Qué se encontró, de qué tipo, dónde, a qué hora y a quién incrimina. |
+| **Declaraciones** | Lo que cada persona declaró. |
+| **Relaciones** | Los vínculos entre las personas. |
+| **Coartadas** | Dónde dice cada uno que estaba, y quién o qué lo respalda. |
+| **Motivos** | Por qué alguien habría querido hacerlo. |
+| **Oportunidades y medios** | Quién fue visto dónde, quién tenía llave, quién estaba autorizado y quién poseía qué. |
+
+Cada sección funciona igual: la tabla con lo que ya hay, **Editar** y
+**Eliminar** en cada fila, y **Agregar…** al final para dar de alta.
+
+### 3.3 Agregar, modificar y eliminar
+
+**Agregar.** Abrí *Agregar…* al final de la sección, completá el formulario y
+dale a **Agregar**. Los desplegables solo ofrecen valores que el caso ya tiene:
+al registrar una evidencia, el campo *Lugar* lista los lugares de ese caso y
+nada más.
+
+**Modificar.** El enlace **Editar** de una fila la abre como formulario en su
+mismo lugar.
+
+![Editar una fila](imagenes/11-admin-edicion.png)
+
+El identificador aparece bloqueado: se modifica el registro, no se cambia por
+otro. Para cambiarlo hay que eliminarlo y crearlo de nuevo.
+
+**Eliminar.** El botón **Eliminar** borra la fila y todo lo que colgaba de ella,
+y el mensaje de confirmación dice exactamente qué se llevó. Por ejemplo, al
+eliminar a una persona:
+
+> Se eliminó la persona. También se quitaron: 1 sospechoso, 2 relacion,
+> 1 motivo, 1 coartada, 1 declaracion.
+
+Es a propósito: una relación con alguien que ya no está en el caso o el motivo
+de un ausente no son datos incompletos, son datos falsos, y el motor deduciría
+con ellos.
+
+### 3.4 Cómo se ve el efecto de un cambio
+
+La sección de **Coartadas** lo muestra sin salir de la pantalla: junto al hecho
+que se puede editar está la columna **Según el motor**, con el veredicto que el
+motor saca de él.
+
+![Coartadas y su veredicto](imagenes/12-admin-coartadas.png)
+
+Una coartada sin respaldo sale como **INVÁLIDA**; una respaldada por un testigo
+que no es sospechoso sale como **VÁLIDA**. Si le cambiás el respaldo a
+`ninguno`, el veredicto cambia en cuanto guardás.
+
+### 3.5 Qué pasa si algo está mal
+
+El sistema no acepta datos que romperían el caso, y explica cuál es el problema:
+
+| Si intentás… | El sistema responde |
+| --- | --- |
+| Un identificador con mayúsculas, espacios o acentos | *debe empezar con minúscula y contener solo letras, dígitos y guion bajo* |
+| Repetir un identificador que ya existe | *ya existe una evidencia 'e1' en caso1* |
+| Nombrar a alguien que no está en el caso | *'fantasma' no es una persona del caso caso1* |
+| Una hora fuera del día | *debe estar entre 0 y 23* |
+| Un tipo que el motor no conoce | *debe ser uno de: deuda, herencia, venganza, celos…* |
+
+### 3.6 Volver todo atrás
+
+Los cambios se guardan y sobreviven a un reinicio del servidor. Si querés dejar
+los casos como estaban, el tablero tiene **Restaurar los N cambios y volver al
+estado de fábrica**: deshace todo lo que se hizo desde administración, incluidas
+las eliminaciones, y los casos vuelven exactamente a como salieron de sus
+archivos originales.
+
+Es la forma segura de probar el módulo sobre los casos reales sin miedo a
+arruinarlos.
 
 ---
 
@@ -193,5 +307,18 @@ anteriores siguen listadas en el módulo administrativo.
 No baja solo: baja al pedir pistas. Cada pista tiene costo.
 
 **Un caso aparece como INCOMPLETO.**
-Solo debería pasar con el caso marcado como **EJEMPLO**, que es una
-demostración y no tiene que alcanzar los mínimos.
+Le falta alguno de los cinco mínimos; la fila del tablero dice cuál, con el
+formato `alcanzado/mínimo`. Es normal en dos situaciones: el caso marcado como
+**EJEMPLO**, que es una demostración y no tiene que alcanzarlos, y un caso
+recién creado desde administración, que empieza sin reglas de inferencia
+propias.
+
+**Cambié algo en administración y la investigación no lo muestra.**
+Las pantallas de análisis consultan al motor cuando se pulsa su botón, no al
+cargar la página. Volvé a pulsar el botón del análisis correspondiente. Si el
+caso ya estaba abierto como investigación, el cambio se ve igual: no hace falta
+reiniciarla.
+
+**Borré algo que no debía.**
+En el módulo administrativo, **Restaurar los N cambios y volver al estado de
+fábrica** deshace todo, incluidas las eliminaciones.

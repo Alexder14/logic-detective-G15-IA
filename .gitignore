@@ -23,3 +23,7 @@ htmlcov/
 
 # Sistema
 .DS_Store
+
+# Estado del módulo administrativo (bitácora y casos generados).
+# Se regenera solo; en Docker va en un volumen.
+datos/

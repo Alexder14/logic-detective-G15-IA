@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% block titulo %}Administrar {{ caso.titulo }} — Logic Detective{% endblock %}
+
+{#
+  Editor administrativo de un caso.
+
+  Las ocho entidades se describen como datos en `ENTIDADES` (frontend/app.py) y
+  esta plantilla las recorre, así que agregar una novena no debería tocar este
+  archivo. Sin JavaScript: la fila en edición la decide el servidor.
+#}
+
+{% macro opciones_de(fuente) %}
+  {# El esquema da listas o diccionarios; de estos interesan las claves. #}
+  {%- set valores = esquema.get(fuente, []) -%}
+  {{- (valores.keys() | list if valores is mapping else valores) | tojson -}}
+{% endmacro %}
+
+{% macro entrada(campo, fila, prefijo, bloqueado) %}
+  {%- set valor = fila.get(campo.valor_de, '') if fila else '' -%}
+  {%- set nombre = campo.nombre -%}
+  {%- set id_campo = prefijo ~ '-' ~ nombre -%}
+
+  {% if campo.tipo == 'casilla' %}
+    <label class="campo-casilla">
+      <input type="checkbox" id="{{ id_campo }}" name="{{ nombre }}"
+             {% if valor %}checked{% endif %}>
+      {{ campo.etiqueta }}
+    </label>
+
+  {% elif campo.tipo == 'multiple' %}
+    {% set elegidos = valor or [] %}
+    <fieldset class="campo-multiple">
+      <legend>{{ campo.etiqueta }}</legend>
+      {% set disponibles = esquema.get(campo.fuente, []) %}
+      {% if disponibles %}
+        {% for opcion in disponibles %}
+          <label class="campo-casilla">
+            <input type="checkbox" name="{{ nombre }}" value="{{ opcion }}"
+                   {% if opcion in elegidos %}checked{% endif %}>
+            {{ opcion | nombre }}
+          </label>
+        {% endfor %}
+      {% else %}
+        <p class="nota">Todavía no hay {{ campo.fuente }} en este caso.</p>
+      {% endif %}
+    </fieldset>
+
+  {% elif campo.tipo == 'argumentos' %}
+    {% set argumentos = valor or [] %}
+    <fieldset class="campo-multiple">
+      <legend>{{ campo.etiqueta }}</legend>
+      {% for indice in range(3) %}
+        <input type="text" name="argumentos" list="referencias-{{ caso.id }}"
+               value="{{ argumentos[indice] if argumentos | length > indice else '' }}"
+               aria-label="Argumento {{ indice + 1 }}"
+               placeholder="argumento {{ indice + 1 }}">
+      {% endfor %}
+      <small class="nota">
+        Según el tipo:
+        {% for tipo, partes in esquema.get('tipos_declaracion', {}).items() %}
+          <code>{{ tipo }}({{ partes | join(', ') }})</code>{% if not loop.last %} · {% endif %}
+        {% endfor %}
+        Dejá vacío el tercero cuando el tipo solo lleva dos.
+      </small>
+    </fieldset>
+
+  {% else %}
+    <label for="{{ id_campo }}">{{ campo.etiqueta }}</label>
+    {% if campo.tipo == 'seleccion' %}
+      <select id="{{ id_campo }}" name="{{ nombre }}"
+              {% if bloqueado %}disabled{% endif %}
+              {% if not campo.opcional %}required{% endif %}>
+        {% if campo.opcional %}<option value="">—</option>{% endif %}
+        {% set valores = esquema.get(campo.fuente, []) %}
+        {% for opcion in (valores.keys() | list if valores is mapping else valores) %}
+          <option value="{{ opcion }}" {% if opcion == valor %}selected{% endif %}>
+            {{ opcion | nombre }}
+          </option>
+        {% endfor %}
+      </select>
+      {% if bloqueado %}
+        {# Un control deshabilitado no se envía; la clave viaja igual. #}
+        <input type="hidden" name="{{ nombre }}" value="{{ valor }}">
+      {% endif %}
+
+    {% elif campo.tipo in ('entero', 'hora_opcional') %}
+      <input type="number" id="{{ id_campo }}" name="{{ nombre }}"
+             min="0" max="23" value="{{ valor if valor not in (None, 'desconocida') else '' }}"
+             {% if campo.tipo == 'hora_opcional' %}placeholder="desconocida"{% endif %}
+             {% if not campo.opcional %}required{% endif %}
+             {% if bloqueado %}readonly{% endif %}>
+
+    {% elif campo.tipo == 'referencia' %}
+      <input type="text" id="{{ id_campo }}" name="{{ nombre }}"
+             list="referencias-{{ caso.id }}" value="{{ valor or '' }}"
+             {% if not campo.opcional %}required{% endif %}
+             {% if bloqueado %}readonly{% endif %}>
+
+    {% else %}
+      <input type="text" id="{{ id_campo }}" name="{{ nombre }}"
+             value="{{ valor or '' }}"
+             {% if not campo.opcional %}required{% endif %}
+             {% if bloqueado %}readonly{% endif %}>
+    {% endif %}
+    {% if campo.ayuda %}<small class="nota">{{ campo.ayuda }}</small>{% endif %}
+  {% endif %}
+{% endmacro %}
+
+{% macro celda(fila, columna) %}
+  {%- set clave, titulo, formato = columna -%}
+  {%- set valor = fila.get(clave) -%}
+  {% if formato == 'nombre' %}{{ valor | nombre }}
+  {% elif formato == 'codigo' %}<code>{{ valor }}</code>
+  {% elif formato == 'etiqueta' %}<span class="etiqueta">{{ valor | nombre }}</span>
+  {% elif formato == 'si_no' %}
+    {% if valor %}<span class="etiqueta valida">sí</span>{% else %}<span class="nota">no</span>{% endif %}
+  {% elif formato == 'lista' %}
+    {% if valor %}{{ valor | map('nombre') | join(', ') }}{% else %}<span class="nota">—</span>{% endif %}
+  {% elif formato == 'veredicto' %}
+    {% if valor %}
+      <span class="etiqueta {{ 'valida' if valor.estado == 'valida' else 'invalida' }}">{{ valor.estado }}</span>
+      <br><small><code>{{ valor.detalle }}</code></small>
+    {% else %}<span class="nota">—</span>{% endif %}
+  {% else %}
+    {% if valor not in (None, '') %}{{ valor }}{% else %}<span class="nota">—</span>{% endif %}
+  {% endif %}
+{% endmacro %}
+
+{% block contenido %}
+
+<p class="migas">
+  <a href="{{ url_for('admin') }}">← Módulo administrativo</a>
+</p>
+
+<h1>{{ caso.titulo }}</h1>
+<p class="proposito">
+  <code>{{ caso.id }}</code>
+  <span class="etiqueta {{ caso.estado }}">{{ caso.estado }}</span>
+  <span class="etiqueta">{{ caso.dificultad }}</span>
+  {% if caso.creado_en_administracion %}
+    <span class="etiqueta ejemplo">creado desde administración</span>
+  {% endif %}
+</p>
+
+<p class="nota">
+  Lo que se cambie acá lo ve la investigación en la consulta siguiente: se
+  escribe en la misma base de conocimiento que consulta el motor.
+  <a href="{{ url_for('investigar_caso', caso_id=caso.id) }}">Abrir el caso en investigación</a>.
+</p>
+
+{# Un solo datalist para todos los campos que apuntan a algo del caso. #}
+<datalist id="referencias-{{ caso.id }}">
+  {% for valor in esquema.get('personas', []) + esquema.get('lugares', [])
+                  + esquema.get('evidencias', []) + esquema.get('medios', []) %}
+    <option value="{{ valor }}"></option>
+  {% endfor %}
+</datalist>
+
+<section class="panel-admin" id="ficha">
+  <h2>Ficha del caso</h2>
+  <p class="detalle-entidad">
+    La descripción es lo primero que lee el detective, y los tres hechos de
+    abajo son de los que cuelga casi toda la inferencia: sin escena nadie tuvo
+    oportunidad, y sin medio requerido nadie tuvo capacidad.
+  </p>
+  <form method="post" action="{{ url_for('editar_ficha', caso_id=caso.id) }}">
+    <div class="rejilla-campos">
+      <div>
+        <label for="ficha-titulo">Título</label>
+        <input type="text" id="ficha-titulo" name="titulo" value="{{ caso.titulo }}" required>
+      </div>
+      <div>
+        <label for="ficha-dificultad">Dificultad</label>
+        <select id="ficha-dificultad" name="dificultad">
+          {% for opcion in esquema.get('dificultades', []) %}
+            <option value="{{ opcion }}" {% if opcion == caso.dificultad %}selected{% endif %}>
+              {{ opcion | nombre }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="ficha-escena">Escena del incidente</label>
+        <select id="ficha-escena" name="escena">
+          <option value="">— sin definir —</option>
+          {% set escena_actual = (caso.ficha.escena_del_incidente or [None])[0] %}
+          {% for lugar in esquema.get('lugares', []) %}
+            <option value="{{ lugar }}" {% if lugar == escena_actual %}selected{% endif %}>
+              {{ lugar | nombre }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="ficha-hora">Hora del incidente</label>
+        <input type="number" id="ficha-hora" name="hora_incidente" min="0" max="23"
+               value="{{ (caso.ficha.hora_del_incidente or [''])[0] }}">
+      </div>
+    </div>
+
+    <label for="ficha-descripcion">Descripción</label>
+    <textarea id="ficha-descripcion" name="descripcion" rows="3" required>{{ caso.descripcion }}</textarea>
+
+    <fieldset class="campo-multiple">
+      <legend>Medios que exigió el incidente</legend>
+      {% for medio in esquema.get('medios', []) %}
+        <label class="campo-casilla">
+          <input type="checkbox" name="medios_requeridos" value="{{ medio }}"
+                 {% if medio in caso.ficha.medio_requerido %}checked{% endif %}>
+          {{ medio | nombre }}
+        </label>
+      {% endfor %}
+    </fieldset>
+
+    <button type="submit">Guardar la ficha</button>
+  </form>
+</section>
+
+{% for entidad, spec in entidades.items() %}
+  {% set filas = datos.get(entidad, []) %}
+  <section class="panel-admin" id="{{ entidad }}">
+    <h2>{{ spec.titulo }} <span class="chip-n">{{ filas | length }}</span></h2>
+    <p class="detalle-entidad">{{ spec.detalle }}</p>
+
+    {% if filas %}
+      <div class="tabla-scroll">
+        <table>
+          <thead>
+            <tr>
+              {% for columna in spec.columnas %}<th>{{ columna[1] }}</th>{% endfor %}
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fila in filas %}
+              {% set id_fila = clave_de(fila, spec.clave) %}
+              {% if editar_entidad == entidad and editar_clave == id_fila %}
+                <tr class="fila-en-edicion">
+                  <td colspan="{{ spec.columnas | length + 1 }}">
+                    <form method="post"
+                          action="{{ url_for('editar_registro', caso_id=caso.id, entidad=entidad) }}">
+                      <p class="nota">
+                        Editando <code>{{ id_fila }}</code>. Los campos que
+                        identifican el registro no se pueden cambiar: para eso
+                        hay que borrarlo y crearlo de nuevo.
+                      </p>
+                      <div class="rejilla-campos">
+                        {% for campo in spec.campos %}
+                          <div>{{ entrada(campo, fila, 'editar-' ~ entidad, campo.clave) }}</div>
+                        {% endfor %}
+                      </div>
+                      <div class="acciones">
+                        <button type="submit">Guardar</button>
+                        <a class="boton" href="{{ url_for('administrar_caso', caso_id=caso.id, _anchor=entidad) }}">Cancelar</a>
+                      </div>
+                    </form>
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  {% for columna in spec.columnas %}
+                    <td>{{ celda(fila, columna) }}</td>
+                  {% endfor %}
+                  <td class="acciones-fila">
+                    {% if spec.get('editable', True) %}
+                      <a href="{{ url_for('administrar_caso', caso_id=caso.id,
+                                          editar=entidad ~ ':' ~ id_fila, _anchor=entidad) }}">Editar</a>
+                    {% endif %}
+                    <form method="post" class="en-linea"
+                          action="{{ url_for('eliminar_registro', caso_id=caso.id, entidad=entidad) }}">
+                      {% for nombre_clave in spec.clave %}
+                        <input type="hidden" name="{{ nombre_clave }}" value="{{ fila.get(nombre_clave) if fila.get(nombre_clave) is not none else '' }}">
+                      {% endfor %}
+                      <button type="submit" class="peligro">Eliminar</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="vacio">Este caso todavía no tiene {{ spec.titulo | lower }}.</p>
+    {% endif %}
+
+    <details class="alta" {% if not filas %}open{% endif %}>
+      <summary>Agregar {{ spec.singular }}</summary>
+      <form method="post"
+            action="{{ url_for('crear_registro', caso_id=caso.id, entidad=entidad) }}">
+        <div class="rejilla-campos">
+          {% for campo in spec.campos %}
+            <div>{{ entrada(campo, none, 'nuevo-' ~ entidad, false) }}</div>
+          {% endfor %}
+        </div>
+        <button type="submit">Agregar</button>
+      </form>
+    </details>
+  </section>
+{% endfor %}
+
+{% endblock %}

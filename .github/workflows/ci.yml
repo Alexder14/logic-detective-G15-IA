@@ -70,6 +70,29 @@ jobs:
                           [M,E,NS,NE,NL,ND])),
             halt"
 
+      # El módulo administrativo escribe con assertz/retract sobre los módulos
+      # de cada caso. Eso solo funciona si reglas_base.pl declara `dynamic` el
+      # esquema de hechos y cada caso la incluye ANTES de los suyos. Si alguien
+      # mueve ese `include` o quita una declaración, el CRUD deja de escribir;
+      # esto lo detecta acá, sin levantar Python.
+      - name: Verificar que la base de conocimiento admite escritura
+        run: |
+          swipl -q -g "
+            consult('prolog/logic_detective.pl'),
+            assertz(caso1:sospechoso(prueba_de_ci)),
+            ( caso1:sospechoso(prueba_de_ci) -> true
+            ; format('el alta no quedó~n'), halt(1) ),
+            ( logic_detective:api_admin_hechos(caso1, sospechoso(prueba_de_ci), T)
+            -> format('alta y lectura OK: ~w~n', [T])
+            ; format('api_admin_hechos no devolvió el hecho~n'), halt(1) ),
+            retractall(caso1:sospechoso(prueba_de_ci)),
+            ( caso1:sospechoso(prueba_de_ci) -> format('la baja no borró~n'), halt(1)
+            ; format('baja OK~n') ),
+            logic_detective:registrar_caso(caso_de_ci),
+            ( logic_detective:caso_modulo(caso_de_ci) -> format('alta de caso OK~n')
+            ; format('registrar_caso no funcionó~n'), halt(1) ),
+            halt"
+
   tests:
     name: Pruebas automatizadas
     runs-on: ubuntu-latest
@@ -142,6 +165,27 @@ jobs:
           curl -fsS -b "$JAR" -c "$JAR" \
             http://localhost:8080/investigacion/caso_demo/informe \
             | tee /dev/stderr | grep -q "examinó la evidencia e1"
+
+      # El módulo administrativo escribe en la base de conocimiento y el cambio
+      # tiene que verse desde la investigación, que es el punto del módulo.
+      # Al final restaura, así el resto de las verificaciones ve el caso intacto.
+      - name: Verificar el módulo administrativo
+        run: |
+          curl -fsS -X POST http://localhost:8000/api/admin/casos/caso1/personas \
+            -H 'Content-Type: application/json' \
+            -d '{"nombre":"testigo_de_ci","rol":"sospechoso"}' > /dev/null
+          curl -fsS http://localhost:8000/api/casos/caso1/sospechosos \
+            | grep -q 'testigo_de_ci'
+          # Un dato inválido tiene que ser rechazado, no afirmado.
+          test "$(curl -s -o /dev/null -w '%{http_code}' \
+            -X POST http://localhost:8000/api/admin/casos/caso1/motivos \
+            -H 'Content-Type: application/json' \
+            -d '{"persona":"testigo_de_ci","tipo":"inventado"}')" = "400"
+          curl -fsS -X POST http://localhost:8000/api/admin/restaurar \
+            | tee /dev/stderr | grep -q '"estado":"restaurado"'
+          ! curl -fsS http://localhost:8000/api/casos/caso1/sospechosos \
+            | grep -q 'testigo_de_ci'
+          curl -fsS http://localhost:8080/admin/casos/caso1 > /dev/null
 
       - name: Logs si algo falló
         if: failure()

@@ -10,6 +10,7 @@ test_prolog_integracion.py y la API en test_api.py.
 from __future__ import annotations
 
 import re
+from urllib.parse import parse_qs
 
 import pytest
 
@@ -41,6 +42,112 @@ CASOS = [
 
 # Los que el sorteo puede devolver: tienen hechos cargados.
 INVESTIGABLES = {"caso_demo", "caso1"}
+
+# --------------------------------------------------------------------------
+# Datos del módulo administrativo
+# --------------------------------------------------------------------------
+
+#: Copia de lo que publica /api/admin/esquema, con la misma forma.
+ESQUEMA = {
+    "dificultades": ["facil", "media", "dificil"],
+    "roles": ["sospechoso", "testigo", "victima"],
+    "tipos_relacion": ["socio", "rival", "empleado", "heredero"],
+    "tipos_motivo": ["deuda", "herencia", "venganza"],
+    "medios": ["llave", "codigo_alarma", "fuerza"],
+    "tipos_evidencia": ["huella", "video", "documento"],
+    "tipos_declaracion": {
+        "estuvo_en": ["persona", "lugar", "hora"],
+        "no_estuvo_en": ["persona", "lugar", "hora"],
+        "posee": ["persona", "medio"],
+    },
+    "tipos_respaldo": {
+        "testigo": "persona",
+        "camara": "lugar",
+        "documento": "evidencia",
+        "ninguno": None,
+    },
+    "tipos_oportunidad": {
+        "visto_en": {"objeto": "lugar", "hora": True},
+        "posee_medio": {"objeto": "medio", "hora": False},
+    },
+}
+
+#: Qué campos identifican a cada entidad, igual que en la API real.
+CLAVES_ADMIN = {
+    "personas": ("nombre",),
+    "lugares": ("nombre",),
+    "evidencias": ("id",),
+    "declaraciones": ("id",),
+    "relaciones": ("persona", "con_quien"),
+    "coartadas": ("persona",),
+    "motivos": ("persona", "tipo"),
+    "oportunidades": ("tipo", "persona", "objeto", "hora"),
+}
+
+ADMIN_INICIAL = {
+    "personas": [
+        {"nombre": "victor_cordero", "rol": "sospechoso"},
+        {"nombre": "bruno_salcedo", "rol": "testigo"},
+        {"nombre": "adriana_belmonte", "rol": "victima"},
+    ],
+    "lugares": [
+        {
+            "nombre": "salon_principal",
+            "descripcion": "Salón principal de la gala",
+            "es_escena": True,
+            "conectado_con": ["guardarropa"],
+        },
+        {
+            "nombre": "guardarropa",
+            "descripcion": "Guardarropa junto al salón",
+            "es_escena": False,
+            "conectado_con": [],
+        },
+    ],
+    "evidencias": [
+        {
+            "id": "e1",
+            "tipo": "huella",
+            "lugar": "salon_principal",
+            "hora": 22,
+            "descripcion": "Huella parcial en la vitrina",
+            "incrimina": ["victor_cordero"],
+        }
+    ],
+    "declaraciones": [
+        {
+            "id": "d1",
+            "autor": "bruno_salcedo",
+            "tipo": "estuvo_en",
+            "contenido": "estuvo_en(victor_cordero,salon_principal,22)",
+        }
+    ],
+    "relaciones": [
+        {
+            "persona": "victor_cordero",
+            "con_quien": "adriana_belmonte",
+            "tipo": "empleado",
+        }
+    ],
+    "coartadas": [
+        {
+            "persona": "victor_cordero",
+            "lugar": "guardarropa",
+            "hora": 22,
+            "respaldo": "ninguno",
+            "veredicto": {"estado": "invalida", "detalle": "sin_respaldo"},
+        }
+    ],
+    "motivos": [{"persona": "victor_cordero", "tipo": "deuda"}],
+    "oportunidades": [
+        {
+            "tipo": "visto_en",
+            "persona": "victor_cordero",
+            "objeto": "salon_principal",
+            "hora": 22,
+        }
+    ],
+}
 
 EVIDENCIAS = [
     {
@@ -151,6 +258,10 @@ class BackendFalso:
         self.ErrorBackend = error_backend
         self.investigaciones: dict[str, dict] = {}
         self.creadas = 0
+        self.admin = {k: [dict(f) for f in v] for k, v in ADMIN_INICIAL.items()}
+        self.operaciones = []
+        self.casos_creados = set()
+        self.casos_eliminados = set()
 
     # -- estado de una investigación ----------------------------------------
 
@@ -183,8 +294,134 @@ class BackendFalso:
 
     # -- enrutado ------------------------------------------------------------
 
+    # -- módulo administrativo ---------------------------------------------
+    #
+    # En memoria y con la forma que devuelve la API real. Acá se prueba la capa
+    # de presentación; que el `assertz` llegue a Prolog se prueba en
+    # test_admin.py, contra el motor de verdad.
+
+    def _admin_ficha(self, caso_id):
+        for c in CASOS:
+            if c["id"] == caso_id:
+                ficha = dict(c)
+                ficha["creado_en_administracion"] = caso_id in self.casos_creados
+                ficha["ficha"] = {
+                    "escena_del_incidente": ["salon_principal"],
+                    "hora_del_incidente": [22],
+                    "medio_requerido": ["llave"],
+                }
+                return ficha
+        raise self.ErrorBackend("404: El caso no existe", 404)
+
+    def _admin_clave(self, entidad, fila):
+        return tuple(str(fila.get(nombre, "")) for nombre in CLAVES_ADMIN[entidad])
+
+    def _admin_registrar(self, tipo, termino):
+        self.operaciones.insert(
+            0, {"modulo": "caso1", "tipo": tipo, "termino": termino, "removidos": []}
+        )
+
+    def _admin(self, ruta, metodo, json, parametros):
+        """Atiende /api/admin/*. Devuelve None si la ruta no es suya.
+
+        La clave de una oportunidad viaja en la query string; `requests` la
+        separaría solo, acá hay que hacerlo a mano.
+        """
+        ruta, _, consulta = ruta.partition("?")
+        if consulta:
+            parametros = {
+                **parametros,
+                **{clave: valores[0] for clave, valores in parse_qs(consulta).items()},
+            }
+        if ruta == "/api/admin/esquema":
+            return ESQUEMA
+        if ruta == "/api/admin/historial":
+            return {
+                "cambios": len(self.operaciones),
+                "casos_creados": sorted(self.casos_creados),
+                "casos_eliminados": sorted(self.casos_eliminados),
+                "operaciones": list(self.operaciones),
+            }
+        if ruta == "/api/admin/restaurar" and metodo == "POST":
+            deshechas = len(self.operaciones)
+            self.operaciones.clear()
+            self.casos_creados.clear()
+            self.casos_eliminados.clear()
+            self.admin = {k: [dict(f) for f in v] for k, v in ADMIN_INICIAL.items()}
+            return {"estado": "restaurado", "operaciones_deshechas": deshechas}
+
+        if ruta == "/api/admin/casos" and metodo == "POST":
+            self.casos_creados.add(json["id"])
+            self._admin_registrar("alta", f"caso({json['id']},...)")
+            return {"id": json["id"], "titulo": json["titulo"], "estado": "pendiente"}
+
+        coincide = re.fullmatch(r"/api/admin/casos/([^/]+)", ruta)
+        if coincide:
+            caso_id = coincide.group(1)
+            if metodo == "DELETE":
+                definitivo = caso_id in self.casos_creados
+                self.casos_creados.discard(caso_id)
+                if not definitivo:
+                    self.casos_eliminados.add(caso_id)
+                return {"eliminado": caso_id, "definitivo": definitivo}
+            if metodo == "PUT":
+                self._admin_registrar("alta", f"caso({caso_id},...)")
+                return self._admin_ficha(caso_id)
+            return self._admin_ficha(caso_id)
+
+        coincide = re.fullmatch(r"/api/admin/casos/([^/]+)/ficha", ruta)
+        if coincide and metodo == "PUT":
+            self._admin_registrar("alta", "escena_del_incidente(salon_principal)")
+            return self._admin_ficha(coincide.group(1))
+
+        coincide = re.fullmatch(
+            rf"/api/admin/casos/([^/]+)/({'|'.join(CLAVES_ADMIN)})(?:/(.+))?", ruta
+        )
+        if coincide is None:
+            return None
+        caso_id, entidad, resto = coincide.groups()
+        self._admin_ficha(caso_id)  # 404 si el caso no existe
+        filas = self.admin[entidad]
+
+        if metodo == "GET":
+            return [dict(fila) for fila in filas]
+
+        if metodo == "POST":
+            nueva = dict(json)
+            if any(
+                self._admin_clave(entidad, f) == self._admin_clave(entidad, nueva)
+                for f in filas
+            ):
+                raise self.ErrorBackend("400: ya existe ese registro", 400)
+            filas.append(nueva)
+            self._admin_registrar("alta", f"{entidad}: {nueva}")
+            return nueva
+
+        if entidad == "oportunidades":
+            clave = tuple(
+                str(parametros.get(nombre, "")) for nombre in CLAVES_ADMIN[entidad]
+            )
+        else:
+            clave = tuple(resto.split("/")) if resto else ()
+
+        for indice, fila in enumerate(filas):
+            if self._admin_clave(entidad, fila) == clave:
+                if metodo == "DELETE":
+                    filas.pop(indice)
+                    self._admin_registrar("baja", f"{entidad}: {clave}")
+                    return {"eliminada": clave[0], "en_cascada": {}}
+                fila.update(json)
+                self._admin_registrar("alta", f"{entidad}: {fila}")
+                return dict(fila)
+        raise self.ErrorBackend("404: no existe ese registro", 404)
+
     def __call__(self, ruta, metodo="GET", json=None, **parametros):
         investigacion_id = parametros.get("investigacion_id")
+
+        if ruta.startswith("/api/admin/") and ruta != "/api/admin/estado":
+            respuesta = self._admin(ruta, metodo, json, parametros)
+            if respuesta is not None:
+                return respuesta
 
         if ruta == "/api/casos":
             casos = list(CASOS)
@@ -721,8 +958,9 @@ def test_el_informe_sin_investigacion_vuelve_al_caso(navegador):
 
 def test_admin_muestra_el_avance_de_los_casos(navegador):
     html = texto(navegador.get("/admin"))
-    assert "Avance de los casos" in html
     assert "Caso caso1" in html
+    assert "/admin/casos/caso1" in html
+    assert "Administrar" in html
 
 
 def test_admin_muestra_las_reglas_de_inferencia_por_caso(navegador):
@@ -781,3 +1019,214 @@ def test_la_pagina_de_inicio_responde(navegador):
 
 def test_el_healthcheck_de_la_interfaz_responde(navegador):
     assert navegador.get("/salud").get_json()["estado"] == "ok"
+
+
+# --------------------------------------------------------------------------
+# Interfaz del módulo administrativo
+# --------------------------------------------------------------------------
+
+
+def test_el_editor_de_un_caso_muestra_las_ocho_entidades(navegador):
+    """Una sola pantalla con todo lo editable del caso."""
+    html = texto(navegador.get("/admin/casos/caso1"))
+    for entidad in (
+        "personas",
+        "lugares",
+        "evidencias",
+        "declaraciones",
+        "relaciones",
+        "coartadas",
+        "motivos",
+        "oportunidades",
+    ):
+        assert f'id="{entidad}"' in html, f"falta la sección de {entidad}"
+
+
+def test_el_editor_ofrece_solo_valores_del_esquema(navegador):
+    """Los desplegables salen del esquema, así que no proponen tipos que
+    reglas_base.pl no sepa interpretar."""
+    html = texto(navegador.get("/admin/casos/caso1"))
+    for tipo in ESQUEMA["tipos_motivo"]:
+        assert f'value="{tipo}"' in html
+
+
+def test_el_editor_solo_ofrece_personas_y_lugares_del_caso(navegador):
+    """Las opciones que dependen del caso las arma la vista con lo que existe."""
+    html = texto(navegador.get("/admin/casos/caso1"))
+    assert 'value="victor_cordero"' in html
+    assert 'value="salon_principal"' in html
+    assert 'value="persona_de_otro_caso"' not in html
+
+
+def test_editar_una_fila_la_abre_como_formulario(navegador):
+    html = texto(navegador.get("/admin/casos/caso1?editar=personas:victor_cordero"))
+    assert "fila-en-edicion" in html
+    assert "no se pueden cambiar" in html
+
+
+def test_un_caso_inexistente_da_404(navegador):
+    assert navegador.get("/admin/casos/inventado").status_code == 404
+
+
+def test_una_entidad_inexistente_da_404(navegador):
+    assert (
+        navegador.post(
+            "/admin/casos/caso1/inventadas/crear", data={"x": "1"}
+        ).status_code
+        == 404
+    )
+
+
+def test_alta_de_una_persona_desde_el_formulario(navegador, backend):
+    respuesta = navegador.post(
+        "/admin/casos/caso1/personas/crear",
+        data={"nombre": "nadia_luna", "rol": "testigo"},
+    )
+    assert respuesta.status_code == 302
+    assert {"nombre": "nadia_luna", "rol": "testigo"} in backend.admin["personas"]
+
+
+def test_el_alta_manda_las_listas_como_listas(navegador, backend):
+    """Las casillas múltiples llegan repetidas: tienen que viajar como lista."""
+    navegador.post(
+        "/admin/casos/caso1/evidencias/crear",
+        data={
+            "id": "e9",
+            "tipo": "video",
+            "lugar": "salon_principal",
+            "hora": "22",
+            "descripcion": "Cámara lateral",
+            "incrimina": ["victor_cordero", "bruno_salcedo"],
+        },
+    )
+    nueva = next(e for e in backend.admin["evidencias"] if e["id"] == "e9")
+    assert nueva["incrimina"] == ["victor_cordero", "bruno_salcedo"]
+
+
+def test_una_evidencia_sin_hora_se_manda_como_desconocida(navegador, backend):
+    navegador.post(
+        "/admin/casos/caso1/evidencias/crear",
+        data={
+            "id": "e10",
+            "tipo": "documento",
+            "lugar": "guardarropa",
+            "hora": "",
+            "descripcion": "Registro sin hora",
+        },
+    )
+    nueva = next(e for e in backend.admin["evidencias"] if e["id"] == "e10")
+    assert nueva["hora"] == "desconocida"
+
+
+def test_la_casilla_de_escena_viaja_como_booleano(navegador, backend):
+    navegador.post(
+        "/admin/casos/caso1/lugares/crear",
+        data={
+            "nombre": "terraza",
+            "descripcion": "Terraza exterior",
+            "es_escena": "on",
+        },
+    )
+    nuevo = next(x for x in backend.admin["lugares"] if x["nombre"] == "terraza")
+    assert nuevo["es_escena"] is True
+
+
+def test_los_argumentos_vacios_de_una_declaracion_se_descartan(navegador, backend):
+    """El formulario muestra tres casillas y `posee` lleva dos: la vacía no
+    puede llegar como un argumento de más."""
+    navegador.post(
+        "/admin/casos/caso1/declaraciones/crear",
+        data={
+            "id": "d9",
+            "autor": "bruno_salcedo",
+            "tipo": "posee",
+            "argumentos": ["victor_cordero", "llave", ""],
+        },
+    )
+    nueva = next(d for d in backend.admin["declaraciones"] if d["id"] == "d9")
+    assert nueva["argumentos"] == ["victor_cordero", "llave"]
+
+
+def test_modificar_una_fila_no_manda_su_clave_en_el_cuerpo(navegador, backend):
+    navegador.post(
+        "/admin/casos/caso1/personas/editar",
+        data={"nombre": "victor_cordero", "rol": "testigo"},
+    )
+    persona = next(
+        p for p in backend.admin["personas"] if p["nombre"] == "victor_cordero"
+    )
+    assert persona["rol"] == "testigo"
+
+
+def test_la_baja_de_una_relacion_usa_sus_dos_claves(navegador, backend):
+    navegador.post(
+        "/admin/casos/caso1/relaciones/eliminar",
+        data={"persona": "victor_cordero", "con_quien": "adriana_belmonte"},
+    )
+    assert backend.admin["relaciones"] == []
+
+
+def test_la_baja_de_una_oportunidad_viaja_por_query_string(navegador, backend):
+    """`visto_en/3` no tiene identificador propio: lo identifica su contenido."""
+    navegador.post(
+        "/admin/casos/caso1/oportunidades/eliminar",
+        data={
+            "tipo": "visto_en",
+            "persona": "victor_cordero",
+            "objeto": "salon_principal",
+            "hora": "22",
+        },
+    )
+    assert backend.admin["oportunidades"] == []
+
+
+def test_un_error_del_backend_se_muestra_y_no_rompe_la_pagina(navegador):
+    """El mensaje del backend es el que ve el usuario."""
+    respuesta = navegador.post(
+        "/admin/casos/caso1/personas/crear",
+        data={"nombre": "victor_cordero", "rol": "testigo"},
+        follow_redirects=True,
+    )
+    html = texto(respuesta)
+    assert "No se pudo agregar la persona" in html
+    assert "ya existe ese registro" in html
+
+
+def test_crear_un_caso_lleva_a_su_editor(navegador, backend):
+    respuesta = navegador.post(
+        "/admin/casos",
+        data={
+            "id": "caso4",
+            "titulo": "Caso nuevo",
+            "descripcion": "Alta desde la interfaz.",
+            "dificultad": "media",
+        },
+    )
+    assert respuesta.status_code == 302
+    assert "/admin/casos/caso4" in respuesta.headers["Location"]
+    assert "caso4" in backend.casos_creados
+
+
+def test_eliminar_un_caso_de_fabrica_avisa_que_es_reversible(navegador):
+    html = texto(navegador.post("/admin/casos/caso3/eliminar", follow_redirects=True))
+    assert "restaurar" in html
+
+
+def test_el_tablero_lista_los_cambios_y_ofrece_restaurar(navegador):
+    navegador.post(
+        "/admin/casos/caso1/personas/crear",
+        data={"nombre": "nadia_luna", "rol": "testigo"},
+    )
+    html = texto(navegador.get("/admin"))
+    assert "Cambios administrativos" in html
+    assert "estado de fábrica" in html
+
+
+def test_restaurar_informa_cuantas_operaciones_deshizo(navegador, backend):
+    navegador.post(
+        "/admin/casos/caso1/personas/crear",
+        data={"nombre": "nadia_luna", "rol": "testigo"},
+    )
+    html = texto(navegador.post("/admin/restaurar", follow_redirects=True))
+    assert "Se deshicieron 1 operaciones" in html
+    assert backend.operaciones == []

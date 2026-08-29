@@ -30,25 +30,35 @@ logic-detective-G15-IA/
 │   ├── reglas_base.pl          # Reglas compartidas por los 3 casos    [LISTO]
 │   ├── logic_detective.pl      # Cargador + fachada api_* del backend  [LISTO]
 │   ├── caso_demo.pl            # Caso mínimo de referencia             [LISTO]
-│   ├── caso1.pl                # Caso 1 — a llenar por el equipo
-│   ├── caso2.pl                # Caso 2 — a llenar por el equipo
-│   └── caso3.pl                # Caso 3 — a llenar por el equipo
+│   ├── caso1.pl                # Caso 1 — El Collar Estelar            [LISTO]
+│   ├── caso2.pl                # Caso 2 — El Sabotaje en el Laboratorio [LISTO]
+│   └── caso3.pl                # Caso 3 — El servidor saboteado         [LISTO]
 ├── backend/                    # API REST + integración PySwip
 │   ├── app/
-│   │   ├── main.py             # Aplicación FastAPI y endpoints
+│   │   ├── main.py             # FastAPI y endpoints de investigación
+│   │   ├── admin_api.py        # Módulo administrativo: CRUD de la base
+│   │   ├── administracion.py   # Bitácora de cambios y su persistencia
+│   │   ├── terminos.py         # Validación y escritura de términos Prolog
+│   │   ├── investigaciones.py  # Descubrimiento progresivo y bitácora
+│   │   ├── comun.py            # Utilidades de los dos módulos
 │   │   └── prolog_engine.py    # Único punto de contacto con PySwip
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/                   # Interfaz web (2 módulos)
 │   ├── app.py                  # Servidor Flask
-│   ├── templates/              # base, inicio, investigacion, caso, informe, admin
+│   ├── templates/              # base, inicio, investigacion, caso, informe,
+│   │                           #   admin, admin_caso
 │   ├── static/estilos.css
 │   ├── requirements.txt
 │   └── Dockerfile
+├── datos/                      # Estado administrativo (no versionado)
 ├── tests/                      # Pruebas automatizadas
 │   ├── conftest.py             # Motor de Prolog compartido por la sesión
-│   ├── test_prolog_integracion.py  # + plantilla de los 10 casos de prueba
+│   ├── test_prolog_integracion.py  # + los 10 casos de prueba
 │   ├── test_api.py
+│   ├── test_investigaciones.py
+│   ├── test_admin.py
+│   ├── test_frontend.py
 │   └── requirements.txt
 ├── docs/                       # Documentación entregable
 ├── .github/workflows/ci.yml    # CI: lint, Prolog, pytest, contenedores
@@ -71,6 +81,13 @@ lo respetes podés escribir tu caso sin tocar nada más del repositorio.
 
 Cada caso es un módulo Prolog aparte (`:- module(caso1, [])`), así que dos
 personas pueden usar los mismos nombres de sospechosos sin colisionar.
+
+El módulo administrativo edita esos mismos hechos en caliente, con
+`assertz`/`retractall`: `reglas_base.pl` declara `dynamic` todo el esquema y cada
+caso la incluye antes de sus hechos. Los cambios se guardan como una bitácora en
+`datos/administracion.json` que se vuelve a aplicar al arrancar, y que se puede
+recorrer al revés para volver al estado de fábrica. El detalle está en la
+sección 5.7 del manual técnico.
 
 ## Cómo levantar el proyecto
 
@@ -239,6 +256,8 @@ desplegado:
 | --- | --- |
 | Tres casos en Prolog con los mínimos (4 sospechosos, 10 evidencias, 5 lugares, 5 declaraciones, 10 reglas propias) | `prolog/caso1.pl`, `caso2.pl`, `caso3.pl` |
 | Interfaz funcional: módulo de investigación y módulo administrativo | `frontend/` |
+| CRUD del módulo administrativo sobre casos, sospechosos, evidencias, lugares, declaraciones, relaciones, coartadas, motivos y oportunidades | `backend/app/admin_api.py`, `frontend/templates/admin_caso.html` |
+| Persistencia de los cambios administrativos y su integración con la investigación | `backend/app/administracion.py` |
 | Integración Python ↔ Prolog vía PySwip | `backend/app/prolog_engine.py` |
 | Los 10 casos de prueba del curso | `tests/test_prolog_integracion.py` |
 | Contenedores y CI/CD | `docker-compose.yml`, `.github/workflows/` |
@@ -253,5 +272,6 @@ caso2  resumen(4,10,5,6,4)  10 reglas propias  responsable: carlos
 caso3  resumen(4,10,5,5,4)  11 reglas propias  responsable: diego_lira
 ```
 
-La suite completa —122 pruebas entre Prolog, API e interfaz— pasa con
-`pytest -q`, y `ruff check . && ruff format --check .` sale limpio.
+La suite completa —186 pruebas entre Prolog, API, módulo administrativo e
+interfaz— pasa con `pytest -q`, y `ruff check . && ruff format --check .` sale
+limpio.

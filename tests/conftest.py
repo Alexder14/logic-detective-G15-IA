@@ -7,7 +7,9 @@ lento y frágil.
 
 from __future__ import annotations
 
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -16,6 +18,12 @@ RAIZ = Path(__file__).resolve().parents[1]
 
 # Permite importar `app.*` sin instalar el backend como paquete.
 sys.path.insert(0, str(RAIZ / "backend"))
+
+# El módulo administrativo persiste su bitácora en LD_DATOS, y lo resuelve al
+# importarse. Se apunta a un directorio temporal *antes* de cualquier import de
+# `app.*`: si no, las pruebas escribirían en los datos reales del proyecto y
+# una corrida dejaría cambios administrativos aplicados de verdad.
+os.environ.setdefault("LD_DATOS", tempfile.mkdtemp(prefix="logic-detective-pruebas-"))
 
 
 @pytest.fixture(scope="session")

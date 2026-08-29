@@ -23,7 +23,7 @@ De acuerdo con los requerimientos normativos del curso, la suma total de partici
 | 199622440 | **Henrry Omar Martínez Charuc** | henrrymartinez | Prolog / Caso 2 y coordinación | Modelo lógico del Caso 2, evidencias, declaraciones, diez reglas de inferencia propias y consultas asociadas. Coordinación del grupo e informe de participación. | 20.0% |
 | 201708845 | **Joshua Estuardo Franco Equite** | JoshF8 | Prolog / Caso 3 y QA | Modelo lógico del Caso 3 con once reglas propias, diseño y ejecución de los 10 casos de prueba del curso. | 20.0% |
 | 201700312 | **Aybson Diddiere Mercado Grijalva** | gtcaps | Backend Python & PySwip | API REST en FastAPI, integración con PySwip, descubrimiento progresivo, bitácora e informe final del caso. | 20.0% |
-| 201020600 | **Pedro Alexander Salazar Pocasangre** | Alexder14 | Interfaz, DevOps y despliegue | Interfaz web en Flask + Jinja2, reglas base en Prolog, Docker Compose, CI/CD en GitHub Actions y despliegue en GCP. | 20.0% |
+| 201020600 | **Pedro Alexander Salazar Pocasangre** | Alexder14 | Interfaz, módulo administrativo, DevOps y despliegue | Interfaz web en Flask + Jinja2, reglas base en Prolog, módulo administrativo con CRUD completo y persistencia, Docker Compose, CI/CD en GitHub Actions y despliegue en GCP. | 20.0% |
 
 ---
 
@@ -36,12 +36,15 @@ De acuerdo con los requerimientos normativos del curso, la suma total de partici
 * Validación manual de consultas lógicas en la consola de SWI-Prolog previo al empaquetado.
 * **Resultado:** Archivo `caso1.pl` completamente funcional, probado y documentado con 16 reglas de inferencia propias.
 
-### • Henrry Martínez (199622440) — *Especialista Prolog - Caso 2*
+### • Henrry Martínez (199622440) — *Coordinador del Grupo & Especialista Prolog - Caso 2*
+* Coordinación general del grupo: asignación de tareas, reuniones semanales, control del cronograma y seguimiento del avance de cada integrante.
+* Integración de los entregables de los cinco integrantes y resolución de los inconvenientes de comunicación del grupo.
+* Elaboración del presente informe de participación y respaldo de los porcentajes reportados.
 * Estructuración de datos y hechos probatorios para el **Caso Investigativo 2**.
 * Poblado de evidencias físicas, testimonios de testigos y cronología de eventos.
 * Implementación de 10+ reglas de inferencia para resolución de contradicciones e identificación del culpable.
 * Ejecución de pruebas directas en SWI-Prolog y optimización del motor de búsqueda mediante cortes (`!`).
-* **Resultado:** Archivo `caso2.pl` integrado, con 10 reglas de inferencia propias y su base de hechos de sospechosos.
+* **Resultado:** Archivo `caso2.pl` integrado, con 10 reglas de inferencia propias y su base de hechos de sospechosos, más la coordinación del grupo y este informe.
 
 ### • Joshua Franco (201708845) — *Especialista Prolog - Caso 3 & Control de Calidad*
 * Desarrollo del **Caso Investigativo 3** con hechos, reglas y consultas de razonamiento.
@@ -57,14 +60,14 @@ De acuerdo con los requerimientos normativos del curso, la suma total de partici
 * Implementación de pruebas unitarias para asegurar la correcta serialización de respuestas JSON para el Frontend.
 * **Resultado:** Servidor FastAPI con los endpoints `/api/casos`, `/api/casos/{caso_id}/sospechosos`, `/api/casos/{caso_id}/contradicciones`, `/api/casos/{caso_id}/acusacion` y `/api/admin/estado`, sobre un puente PySwip estable.
 
-### • Pedro Alexander Salazar (201020600) — *Coordinador, Desarrollador Frontend & DevOps*
-* Gestión, coordinación de reuniones semanales y control del cronograma de trabajo.
+### • Pedro Alexander Salazar (201020600) — *Desarrollador Frontend, Módulo Administrativo & DevOps*
 * Creación y organización del repositorio de GitHub con convenciones de commits y ramas.
 * Desarrollo de la Interfaz Web interactiva e intuitiva para la visualización de los casos y resoluciones.
+* Desarrollo del **módulo administrativo completo**: CRUD de casos, sospechosos, evidencias, lugares, declaraciones, relaciones, coartadas, motivos y oportunidades, con validaciones de esquema e integridad referencial, persistencia de los cambios y restauración al estado de fábrica. La escritura se hace con `assertz`/`retractall` sobre los módulos de Prolog ya cargados, de modo que lo que se edita en administración lo ve la investigación en la consulta siguiente.
 * Contenerización global del sistema mediante Dockerfile y Orchestration con `docker-compose`.
 * Configuración de los pipelines de CI y CD en GitHub Actions —con autenticación por Workload Identity Federation— y despliegue en una VM de Google Cloud Platform, accesible en http://34.121.98.65:8080.
 * Consolidación de la documentación técnica, manuales de usuario y el presente informe de gestión.
-* **Resultado:** Interfaz web desplegada, pipeline CI/CD activo, Docker Compose multinivel y documentación final completa.
+* **Resultado:** Interfaz web desplegada, módulo administrativo con 41 rutas de API y su editor de casos (`backend/app/admin_api.py`, `administracion.py`, `terminos.py`, `frontend/templates/admin_caso.html`), pipeline CI/CD activo, Docker Compose multinivel y documentación final completa. La suite del proyecto pasa 186 pruebas, 45 de ellas del módulo administrativo.
 
 ---
 
@@ -88,7 +91,7 @@ Para respaldar de manera objetiva los porcentajes de participación asignados y 
 1. **Historial de Commits en GitHub:** El repositorio oficial del proyecto contiene aportes significativos de los 5 integrantes con sus respectivos nombres y correos institucionales registrados. La distribución de commits guarda estrecha relación con las responsabilidades asignadas (Prolog, Backend, Frontend, Docker).
 2. **Archivos de Código Fuente Prolog (`.pl`):** Archivos `caso1.pl` (Madeline), `caso2.pl` (Henrry) y `caso3.pl` (Joshua) en el directorio `/prolog`, sobre las reglas compartidas de `reglas_base.pl`. Los 10 casos de prueba de Joshua están en `tests/test_prolog_integracion.py`.
 3. **Módulos de Integración Python (`.py`):** Controladores API REST y wrapper PySwip desarrollados por Aybson Mercado en el directorio `/backend`.
-4. **Infraestructura y Frontend:** Interfaz en Flask + Jinja2 y CSS propio, Dockerfile de cada servicio, `docker-compose.yml`, los pipelines de GitHub Actions y los scripts de despliegue, desarrollados por Pedro Alexander en `/frontend`, `/.github` y `/deploy`.
+4. **Infraestructura, Frontend y Módulo Administrativo:** Interfaz en Flask + Jinja2 y CSS propio, módulo administrativo (`backend/app/admin_api.py`, `administracion.py`, `terminos.py` y `frontend/templates/admin_caso.html`), Dockerfile de cada servicio, `docker-compose.yml`, los pipelines de GitHub Actions y los scripts de despliegue, desarrollados por Pedro Alexander en `/frontend`, `/backend`, `/.github` y `/deploy`.
 5. **Registros de Reuniones y Minutas:** Bitácora interna de 4 sesiones de trabajo vía Google Meet / Discord (04/08, 17/08, 25/08 y 27/08) con asistencia de los 5 integrantes.
 
 ---

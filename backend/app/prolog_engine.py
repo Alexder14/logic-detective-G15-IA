@@ -111,6 +111,51 @@ class MotorProlog:
         """True si la meta tiene al menos una solución."""
         return bool(self.filas(meta, limite=1))
 
+    # -- escritura -----------------------------------------------------------
+    #
+    # Las usa el módulo administrativo. Funcionan porque reglas_base.pl declara
+    # `dynamic` el esquema de hechos y cada caso la incluye antes de los suyos,
+    # así que el motor acepta assertz/retract con el caso ya cargado.
+
+    def ejecutar(self, meta: str) -> bool:
+        """Ejecuta una meta por su efecto y devuelve si tuvo éxito.
+
+        `filas()` no sirve: una meta sin variables que tiene éxito devuelve una
+        solución vacía, indistinguible de la lista vacía de una que falla.
+        """
+        if not self.disponible:
+            raise MotorNoDisponible(self.error or "motor no inicializado")
+        with self._candado:
+            try:
+                soluciones = list(self._prolog.query(f"once(({meta}))", maxresult=1))
+                return bool(soluciones)
+            except Exception as exc:
+                raise ErrorConsulta(f"{meta} -> {type(exc).__name__}: {exc}") from exc
+
+    def afirmar(self, modulo: str, termino: str) -> None:
+        """Agrega un hecho al caso indicado."""
+        self.ejecutar(f"assertz({modulo}:({termino}))")
+
+    def retirar(self, modulo: str, patron: str) -> None:
+        """Borra del caso todos los hechos que unifican con el patrón.
+
+        retractall/1 y no retract/1: no falla si el hecho ya no está, y por eso
+        reaplicar la bitácora es idempotente.
+        """
+        self.ejecutar(f"retractall({modulo}:({patron}))")
+
+    def cargar(self, archivo: Path) -> None:
+        """Consulta un archivo adicional: los casos creados desde administración."""
+        if not self.disponible:
+            raise MotorNoDisponible(self.error or "motor no inicializado")
+        with self._candado:
+            try:
+                self._prolog.consult(archivo.as_posix())
+            except Exception as exc:
+                raise ErrorConsulta(
+                    f"consult({archivo}) -> {type(exc).__name__}: {exc}"
+                ) from exc
+
     def version(self) -> str | None:
         filas = self.filas("version_motor(V)", limite=1)
         return filas[0]["V"] if filas else None

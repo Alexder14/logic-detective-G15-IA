@@ -90,7 +90,7 @@ Los porcentajes deben sumar 100 % y estar respaldados por commits.
 | 199622440 | Henrry Omar Martínez Charuc | Caso 2 en Prolog y su sección del manual técnico. Coordinación del grupo e informe de participación | henrrymartinez | 20 % |
 | 201708845 | Joshua Estuardo Franco Equite | Caso 3 en Prolog, los 10 casos de prueba y su sección del manual técnico | JoshF8 | 20 % |
 | 201700312 | Aybson Diddiere Mercado Grijalva | Backend: descubrimiento progresivo, bitácora e informe final del caso. Pruebas de la API | gtcaps | 20 % |
-| 201020600 | Pedro Alexander Salazar Pocasangre | Estructura del repositorio, reglas base en Prolog, integración con PySwip, interfaz completa, Docker, CI/CD, despliegue y documentación | Alexder14 | 20 % |
+| 201020600 | Pedro Alexander Salazar Pocasangre | Estructura del repositorio, reglas base en Prolog, integración con PySwip, interfaz completa, módulo administrativo (CRUD y persistencia), Docker, CI/CD, despliegue y documentación | Alexder14 | 20 % |
 | | | | **TOTAL** | **100 %** |
 
 P4 aparece en el historial con dos identidades de Git: `Aybson Mercado
@@ -100,8 +100,7 @@ de la máquina donde trabajó. Los dos commits son suyos.
 
 ## Evidencias de respaldo
 
-Falta completar la columna de usuario de GitHub: es lo que permite atribuir los
-commits.
+La columna de usuario de GitHub es lo que permite atribuir los commits:
 
 ```bash
 git log --author="usuario" --oneline
@@ -117,6 +116,28 @@ feature/201020600-interfaz
 ```
 
 El flujo de ramas está en el README.
+
+## Ampliación posterior al cierre inicial
+
+El módulo administrativo se entregó primero como tablero de solo lectura —el
+avance de cada caso contra los mínimos— y después se completó con el CRUD que
+pide el enunciado: alta, consulta, modificación y baja de casos, sospechosos,
+evidencias, lugares, declaraciones, relaciones, coartadas, motivos y
+oportunidades, con validaciones, persistencia e integración con la
+investigación.
+
+Lo hizo P5, en la rama `feature/201020600-modulo-administrativo`, sobre estos
+archivos:
+
+| Archivo | Qué aporta |
+| --- | --- |
+| `prolog/logic_detective.pl` | Fachada `api_admin_*` y alta/baja de casos en caliente |
+| `backend/app/terminos.py` | Validación y escritura de términos de Prolog |
+| `backend/app/administracion.py` | Bitácora de cambios, persistencia y restauración |
+| `backend/app/admin_api.py` | Los endpoints CRUD |
+| `backend/app/comun.py` | Utilidades compartidas por los dos módulos |
+| `frontend/app.py`, `templates/admin_caso.html` | El editor de casos |
+| `tests/test_admin.py` | 45 pruebas del módulo |
 
 ## Incidencias
 

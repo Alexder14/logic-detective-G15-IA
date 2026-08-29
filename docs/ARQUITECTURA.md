@@ -24,12 +24,15 @@ graph LR
 
     subgraph FE["Contenedor frontend · puerto 8080"]
         F["Flask + Jinja2<br/>app.py"]
-        T["Plantillas<br/>base · inicio · investigacion<br/>caso · informe · admin"]
+        T["Plantillas<br/>base · inicio · investigacion · caso<br/>informe · admin · admin_caso"]
         S["estilos.css"]
     end
 
     subgraph BE["Contenedor backend · puerto 8000"]
-        A["FastAPI<br/>main.py"]
+        A["FastAPI · main.py<br/>módulo de investigación"]
+        AD["admin_api.py<br/>módulo administrativo"]
+        TE["terminos.py<br/>validación y escritura<br/>de términos"]
+        AL["administracion.py<br/>bitácora de cambios"]
         M["MotorProlog<br/>prolog_engine.py"]
     end
 
@@ -39,21 +42,33 @@ graph LR
         K["caso1 · caso2 · caso3 · caso_demo<br/>hechos de cada caso"]
     end
 
+    D[("datos/administracion.json<br/>volumen")]
+
     U -->|HTTP| F
     F --> T
     T --> S
     F -->|"HTTP · JSON"| A
-    A --> M
+    F -->|"HTTP · JSON"| AD
+    A -->|"lee: filas()"| M
+    AD --> TE
+    AD --> AL
+    AL -->|"escribe: afirmar() / retirar()"| M
+    AL <-->|"persiste y reaplica"| D
     M -->|"PySwip · FFI"| L
     L --> R
     L --> K
     R -.->|"include/1"| K
 ```
 
+Los dos módulos comparten el mismo motor cargado en memoria: la investigación lo
+consulta y la administración lo escribe. Eso es lo que hace que un alta se vea en
+la consulta siguiente, sin sincronizar nada y sin una segunda copia de los datos.
+
 | Componente | Tecnología | Responsabilidad | Qué **no** hace |
 | --- | --- | --- | --- |
 | frontend | Flask 3.1 + Jinja2 | Presentar y recoger acciones del usuario | No razona ni guarda estado |
 | backend | FastAPI + PySwip | Validar entradas, armar metas Prolog, serializar | No decide nada del dominio |
+| administración | FastAPI + JSON | Editar los hechos del motor y persistir los cambios | No escribe reglas: eso sigue siendo trabajo de un `.pl` |
 | motor | SWI-Prolog 9 | **Toda** la deducción | No presenta ni valida HTTP |
 
 **Regla de diseño que atraviesa el proyecto:** toda deducción ocurre en Prolog.
@@ -102,6 +117,62 @@ Puntos que conviene retener:
    SWI-Prolog no es seguro para llamadas concurrentes desde varios hilos.
 3. **Una lista vacía no es un error.** Un caso todavía sin hechos responde `200`
    con `[]`; es una respuesta válida en lógica.
+
+### 2.1 Flujo de una escritura administrativa
+
+El camino inverso: `POST /api/admin/casos/caso1/motivos`. Muestra dónde se
+valida, dónde se persiste y en qué momento el cambio queda visible para la
+investigación.
+
+```mermaid
+sequenceDiagram
+    actor U as Administrador
+    participant F as Flask<br/>:8080
+    participant AD as admin_api.py
+    participant TE as terminos.py
+    participant AL as administracion.py
+    participant M as MotorProlog
+    participant P as SWI-Prolog
+    participant D as administracion.json
+
+    U->>F: POST /admin/casos/caso1/motivos/crear
+    F->>AD: POST /api/admin/casos/caso1/motivos
+    AD->>TE: uno_de(tipo, TIPOS_MOTIVO)
+    TE-->>AD: "dinero"
+    AD->>M: ¿existe sospechoso(valeria_montes)?
+    M-->>AD: sí
+    Note over AD: integridad referencial:<br/>el motor aceptaria un fantasma<br/>y despues no deduciria nada
+    AD->>TE: hecho("motivo", persona, tipo)
+    TE-->>AD: "motivo(valeria_montes,dinero)"
+    AD->>AL: alta(caso1, termino)
+    AL->>M: afirmar(caso1, termino)
+    M->>P: assertz(caso1:(motivo(valeria_montes,dinero)))
+    AL->>D: escribe la bitacora (temporal + rename)
+    AL-->>AD: listo
+    AD-->>F: 201
+    F-->>U: redirect + mensaje
+
+    Note over P: desde aca, GET /api/casos/caso1/motivos<br/>ya devuelve el motivo nuevo
+```
+
+Si algo falla en la validación, no se escribió nada: el término se arma entero
+—y con él se comprueban todas sus referencias— **antes** del primer `assertz`.
+
+Al arrancar, `administracion.py` vuelve a aplicar esa bitácora sobre el motor
+recién cargado. Es lo que hace que los cambios sobrevivan a un reinicio sin
+tocar los archivos `.pl` de fábrica:
+
+```mermaid
+graph LR
+    PL["archivos .pl<br/>estado de fabrica"] --> MOT["motor en memoria"]
+    D[("administracion.json<br/>bitacora de cambios")] -->|"se reaplica al arrancar"| MOT
+    MOT --> INV["modulo de investigacion"]
+    MOT --> ADM["modulo administrativo"]
+```
+
+Y como cada baja guarda el texto de los hechos que se llevó, la bitácora se
+puede recorrer al revés: eso es **restaurar valores de fábrica**, y es lo que
+permite demostrar el CRUD sobre los casos reales sin arruinarlos.
 
 ---
 
@@ -335,6 +406,10 @@ interferir, y por eso dos integrantes pueden trabajar en paralelo sin conflictos
 | **Validación con `atomo()`** | Las metas se arman concatenando texto | Inyección de código Prolog, equivalente a un SQL injection |
 | **Compilar Prolog en el `docker build`** | Un error de sintaxis falla en el build, con archivo y línea | Fallaría con el contenedor ya corriendo, y más difícil de diagnosticar |
 | **El backend arranca aunque Prolog falle** | Permite diagnosticar el contenedor por `/health` | El contenedor moriría al arrancar sin decir por qué |
+| **Administración escribe con `assertz`/`retractall`, no editando los `.pl`** | Los `.pl` mezclan hechos y reglas; reescribirlos desde la interfaz haría que un error de formato dejara el proyecto sin arrancar | Cada alta tendría que regenerar código fuente y recargar el motor |
+| **Los cambios se guardan como bitácora, no como estado final** | Permite reaplicarlos al arrancar y, sobre todo, deshacerlos en orden inverso | Sin bitácora no habría «restaurar valores de fábrica», y una eliminación sería irreversible |
+| **`terminos.py` es la única forma de construir un término** | Administración interpola registros enteros con texto libre, no solo identificadores | Una comilla en una descripción rompería la cláusula; un valor malicioso sería inyección de Prolog |
+| **Las ocho entidades de la interfaz son datos, no ocho plantillas** | Una sola plantilla recorre `ENTIDADES` | Ochocientas líneas de plantilla casi idéntica, que se desincronizarían entre sí |
 
 ---
 
@@ -399,11 +474,15 @@ graph LR
         T1["test_api.py<br/>FastAPI → PySwip → Prolog<br/>incluye inyeccion"]
         T2["test_prolog_integracion.py<br/>reglas + los 10 casos<br/>del enunciado"]
         T3["test_frontend.py<br/>filtros y rutas<br/>backend simulado"]
+        T4["test_investigaciones.py<br/>descubrimiento progresivo<br/>puntaje y bitacora"]
+        T5["test_admin.py<br/>CRUD, validaciones,<br/>persistencia y su efecto<br/>sobre la deduccion"]
     end
 
     J3 --> T1
     J3 --> T2
     J3 --> T3
+    J3 --> T4
+    J3 --> T5
 ```
 
 `reglas_base.pl` se compila **por separado** a propósito: un error de sintaxis

@@ -46,10 +46,19 @@ p.consult('/app/prolog/logic_detective.pl'); \
 assert list(p.query('caso_modulo(caso1)')), 'la fachada Prolog no responde'; \
 print('PySwip + SWI-Prolog OK')"
 
+# El directorio donde el módulo administrativo persiste su bitácora. Tiene que
+# existir en la imagen y pertenecer al usuario de la aplicación *antes* de que
+# se monte el volumen: Docker copia el dueño del directorio de la imagen al
+# inicializar un volumen con nombre, y si no existe lo crea como root, con lo
+# que el contenedor no podría escribirlo.
+RUN mkdir -p /app/datos
+
 # No correr como root.
 RUN useradd --create-home --uid 1000 detective \
     && chown -R detective:detective /app
 USER detective
+
+ENV LD_DATOS=/app/datos
 
 EXPOSE 8000
 

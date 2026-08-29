@@ -29,6 +29,7 @@ from urllib.parse import urlencode
 import requests
 from flask import (
     Flask,
+    abort,
     flash,
     redirect,
     render_template,
@@ -732,9 +733,382 @@ def resumen_de_investigaciones() -> list[dict[str, Any]]:
     return resumen
 
 
+# --------------------------------------------------------------------------
+# Módulo administrativo
+# --------------------------------------------------------------------------
+#
+# Las ocho entidades comparten el mismo formulario, así que están descritas como
+# datos —`ENTIDADES`— y una sola plantilla las recorre.
+#
+# Acá no hay ninguna regla del dominio: los valores válidos los da
+# `GET /api/admin/esquema` y quien rechaza un dato inválido es el backend.
+
+
+def campo(
+    nombre: str,
+    etiqueta: str,
+    tipo: str = "texto",
+    *,
+    fuente: str | None = None,
+    clave: bool = False,
+    opcional: bool = False,
+    ayuda: str = "",
+    valor_de: str | None = None,
+) -> dict[str, Any]:
+    """Un campo del formulario de una entidad.
+
+    `clave` marca los que forman la identidad del registro: quedan bloqueados al
+    editar, porque cambiarlos no sería modificar el hecho sino reemplazarlo.
+    """
+    return {
+        "nombre": nombre,
+        "etiqueta": etiqueta,
+        "tipo": tipo,
+        "fuente": fuente,
+        "clave": clave,
+        "opcional": opcional,
+        "ayuda": ayuda,
+        # De qué clave de la fila se rellena al editar, si no es su mismo nombre.
+        "valor_de": valor_de or nombre,
+    }
+
+
+ENTIDADES: dict[str, dict[str, Any]] = {
+    "personas": {
+        "titulo": "Personas",
+        "singular": "la persona",
+        "detalle": (
+            "Sospechosos, testigos y víctima. El rol decide quién entra al "
+            "ranking de sospecha y a quién se le exige coartada."
+        ),
+        "clave": ("nombre",),
+        "columnas": (("nombre", "Persona", "nombre"), ("rol", "Rol", "etiqueta")),
+        "campos": (
+            campo(
+                "nombre",
+                "Identificador",
+                "atomo",
+                clave=True,
+                ayuda="minúsculas, dígitos y guion bajo: victor_cordero",
+            ),
+            campo("rol", "Rol", "seleccion", fuente="roles"),
+        ),
+    },
+    "lugares": {
+        "titulo": "Lugares",
+        "singular": "el lugar",
+        "detalle": (
+            "Sin escena del incidente nadie tuvo oportunidad: es el lugar "
+            "sobre el que trabaja tuvo_oportunidad/2."
+        ),
+        "clave": ("nombre",),
+        "columnas": (
+            ("nombre", "Lugar", "nombre"),
+            ("descripcion", "Descripción", "texto"),
+            ("es_escena", "Escena", "si_no"),
+            ("conectado_con", "Conectado con", "lista"),
+        ),
+        "campos": (
+            campo("nombre", "Identificador", "atomo", clave=True),
+            campo("descripcion", "Descripción", "texto"),
+            campo("es_escena", "Es la escena del incidente", "casilla"),
+            campo(
+                "conectado_con",
+                "Conectado con",
+                "multiple",
+                fuente="lugares",
+                opcional=True,
+            ),
+        ),
+    },
+    "evidencias": {
+        "titulo": "Evidencias",
+        "singular": "la evidencia",
+        "detalle": (
+            "Solo huella, adn, video y registro ubican físicamente a alguien; "
+            "son las que pueden contradecir una declaración."
+        ),
+        "clave": ("id",),
+        "columnas": (
+            ("id", "Id", "codigo"),
+            ("tipo", "Tipo", "etiqueta"),
+            ("lugar", "Lugar", "nombre"),
+            ("hora", "Hora", "texto"),
+            ("descripcion", "Descripción", "texto"),
+            ("incrimina", "Incrimina a", "lista"),
+        ),
+        "campos": (
+            campo("id", "Identificador", "atomo", clave=True, ayuda="e1, e2, ..."),
+            campo("tipo", "Tipo", "seleccion", fuente="tipos_evidencia"),
+            campo("lugar", "Lugar", "seleccion", fuente="lugares"),
+            campo(
+                "hora",
+                "Hora",
+                "hora_opcional",
+                opcional=True,
+                ayuda="0 a 23, o vacío si se desconoce",
+            ),
+            campo("descripcion", "Descripción", "texto"),
+            campo(
+                "incrimina",
+                "Incrimina a",
+                "multiple",
+                fuente="personas",
+                opcional=True,
+            ),
+        ),
+    },
+    "declaraciones": {
+        "titulo": "Declaraciones",
+        "singular": "la declaración",
+        "detalle": (
+            "El contenido tiene que ser uno de los términos que las reglas "
+            "saben unificar; con cualquier otro, la declaración no "
+            "contradiría nunca nada."
+        ),
+        "clave": ("id",),
+        "columnas": (
+            ("id", "Id", "codigo"),
+            ("autor", "Autor", "nombre"),
+            ("tipo", "Tipo", "etiqueta"),
+            ("contenido", "Contenido", "codigo"),
+        ),
+        "campos": (
+            campo("id", "Identificador", "atomo", clave=True, ayuda="d1, d2, ..."),
+            campo("autor", "Autor", "seleccion", fuente="personas"),
+            campo("tipo", "Tipo", "seleccion", fuente="tipos_declaracion"),
+            campo("argumentos", "Argumentos", "argumentos"),
+        ),
+    },
+    "relaciones": {
+        "titulo": "Relaciones",
+        "singular": "la relación",
+        "detalle": (
+            "Una relación conflictiva con la víctima —ex_pareja, deudor, "
+            "rival o heredero— le deduce un motivo a quien la tiene."
+        ),
+        "clave": ("persona", "con_quien"),
+        "columnas": (
+            ("persona", "Persona", "nombre"),
+            ("con_quien", "Con", "nombre"),
+            ("tipo", "Tipo", "etiqueta"),
+        ),
+        "campos": (
+            campo("persona", "Persona", "seleccion", fuente="personas", clave=True),
+            campo("con_quien", "Con", "seleccion", fuente="personas", clave=True),
+            campo("tipo", "Tipo", "seleccion", fuente="tipos_relacion"),
+        ),
+    },
+    "coartadas": {
+        "titulo": "Coartadas",
+        "singular": "la coartada",
+        "detalle": (
+            "El respaldo decide si sirve: el testigo no puede ser sospechoso, "
+            "la cámara tiene que estar en un lugar del caso y el documento "
+            "tiene que ser una evidencia registrada."
+        ),
+        "clave": ("persona",),
+        "columnas": (
+            ("persona", "Persona", "nombre"),
+            ("lugar", "Lugar", "nombre"),
+            ("hora", "Hora", "texto"),
+            ("respaldo", "Respaldo", "codigo"),
+            ("veredicto", "Según el motor", "veredicto"),
+        ),
+        "campos": (
+            campo("persona", "Persona", "seleccion", fuente="personas", clave=True),
+            campo("lugar", "Lugar", "seleccion", fuente="lugares"),
+            campo("hora", "Hora", "entero"),
+            campo(
+                "respaldo",
+                "Tipo de respaldo",
+                "seleccion",
+                fuente="tipos_respaldo",
+                valor_de="respaldo_tipo",
+            ),
+            campo(
+                "respaldo_valor",
+                "Respaldo",
+                "referencia",
+                opcional=True,
+                ayuda="la persona, el lugar o la evidencia que lo respalda",
+            ),
+        ),
+    },
+    "motivos": {
+        "titulo": "Motivos",
+        "singular": "el motivo",
+        "detalle": (
+            "Solo los motivos declarados. Los que el motor deduce de una "
+            "relación conflictiva no se listan acá: se quitan cambiando la "
+            "relación."
+        ),
+        "clave": ("persona", "tipo"),
+        "columnas": (
+            ("persona", "Persona", "nombre"),
+            ("tipo", "Motivo", "etiqueta"),
+        ),
+        "campos": (
+            campo("persona", "Persona", "seleccion", fuente="personas", clave=True),
+            campo("tipo", "Motivo", "seleccion", fuente="tipos_motivo", clave=True),
+        ),
+    },
+    "oportunidades": {
+        "titulo": "Oportunidades y medios",
+        "singular": "el hecho",
+        "detalle": (
+            "Los cinco hechos con los que el motor deduce quién pudo estar en "
+            "la escena y quién tenía con qué. No se editan: se dan de alta y "
+            "de baja."
+        ),
+        "clave": ("tipo", "persona", "objeto", "hora"),
+        "editable": False,
+        "columnas": (
+            ("tipo", "Hecho", "etiqueta"),
+            ("persona", "Persona", "nombre"),
+            ("objeto", "Lugar o medio", "nombre"),
+            ("hora", "Hora", "texto"),
+        ),
+        "campos": (
+            campo("tipo", "Hecho", "seleccion", fuente="tipos_oportunidad"),
+            campo("persona", "Persona", "seleccion", fuente="personas"),
+            campo(
+                "objeto",
+                "Lugar o medio",
+                "referencia",
+                ayuda="un lugar, o un medio si el hecho es posee_medio",
+            ),
+            campo(
+                "hora",
+                "Hora",
+                "entero",
+                opcional=True,
+                ayuda="solo para visto_en y registro_acceso",
+            ),
+        ),
+    },
+}
+
+
+#: `vio_a(bruno,salon,22)` -> funtor y argumentos, para volver a llenar el
+#: formulario a partir del término que devuelve el backend.
+TERMINO = re.compile(r"^([a-z][a-zA-Z0-9_]*)\((.*)\)$")
+
+
+def partes_de_termino(termino: Any) -> tuple[str, list[str]]:
+    """Separa un término en su funtor y sus argumentos.
+
+    No es un lector de Prolog: los términos que llegan acá los arma el módulo
+    administrativo, y en ellos ningún argumento lleva paréntesis ni comas.
+    """
+    crudo = str(termino or "").strip()
+    coincide = TERMINO.match(crudo)
+    if coincide is None:
+        return crudo, []
+    return coincide.group(1), [
+        parte.strip() for parte in coincide.group(2).split(",") if parte.strip()
+    ]
+
+
+def desarmar_para_el_formulario(entidad: str, filas: list[dict[str, Any]]) -> None:
+    """Desarma los términos que el backend entrega escritos.
+
+    El contenido de una declaración y el respaldo de una coartada llegan como
+    términos, que es lo correcto para mostrarlos; para editarlos hace falta el
+    funtor por un lado y los argumentos por otro.
+    """
+    for fila in filas:
+        if entidad == "declaraciones":
+            _, fila["argumentos"] = partes_de_termino(fila.get("contenido"))
+        elif entidad == "coartadas":
+            clase, argumentos = partes_de_termino(fila.get("respaldo"))
+            fila["respaldo_tipo"] = clase
+            fila["respaldo_valor"] = argumentos[0] if argumentos else ""
+        elif entidad == "evidencias" and fila.get("hora") == "desconocida":
+            # El campo es numérico: "desconocida" se representa dejándolo vacío.
+            fila["hora"] = ""
+
+
+@app.template_global()
+def clave_de(fila: dict[str, Any], claves: tuple[str, ...]) -> str:
+    """Identidad de una fila. Va en la URL como `?editar=entidad:clave`."""
+    return "|".join(str(fila.get(nombre) or "") for nombre in claves)
+
+
+def entidad_valida(entidad: str) -> dict[str, Any]:
+    """La especificación de la entidad, o 404 si la URL trae cualquier cosa."""
+    if entidad not in ENTIDADES:
+        abort(404)
+    return ENTIDADES[entidad]
+
+
+def valor_de_formulario(campo_spec: dict[str, Any], formulario: Any) -> Any:
+    """Traduce lo que mandó el navegador al tipo que espera la API.
+
+    El backend valida de nuevo todo esto; convertir acá evita mandarle
+    `"hora": ""` cuando lo que se quiso decir fue "sin hora".
+    """
+    nombre = campo_spec["nombre"]
+    tipo = campo_spec["tipo"]
+    if tipo == "casilla":
+        return nombre in formulario
+    if tipo == "multiple":
+        return formulario.getlist(nombre)
+    if tipo == "argumentos":
+        return [
+            valor.strip() for valor in formulario.getlist("argumentos") if valor.strip()
+        ]
+    crudo = (formulario.get(nombre) or "").strip()
+    if tipo == "hora_opcional":
+        return crudo or "desconocida"
+    if tipo == "entero":
+        if not crudo:
+            return None
+        try:
+            return int(crudo)
+        except ValueError:
+            # Se manda tal cual: el error del backend explica mejor que uno de acá.
+            return crudo
+    return crudo or None
+
+
+def cuerpo_de_formulario(spec: dict[str, Any], formulario: Any, editar: bool) -> dict:
+    """Arma el JSON de la petición desde la especificación de la entidad.
+
+    Al editar se omiten los campos clave: van en la URL.
+    """
+    return {
+        campo_spec["nombre"]: valor_de_formulario(campo_spec, formulario)
+        for campo_spec in spec["campos"]
+        if not (editar and campo_spec["clave"])
+    }
+
+
+def ruta_entidad(
+    caso_id: str, entidad: str, clave: dict[str, Any] | None = None
+) -> str:
+    """Ruta del backend para la entidad, con o sin clave.
+
+    Las oportunidades van por query string: `visto_en/3` no tiene identificador
+    propio, lo identifica su contenido entero.
+    """
+    base = f"/api/admin/casos/{caso_id}/{entidad}"
+    if not clave:
+        return base
+    if entidad == "oportunidades":
+        partes = {k: v for k, v in clave.items() if v not in (None, "", "None")}
+        return f"{base}?{urlencode(partes)}"
+    return base + "".join(f"/{clave[nombre]}" for nombre in ENTIDADES[entidad]["clave"])
+
+
+def clave_desde(spec: dict[str, Any], origen: Any) -> dict[str, Any]:
+    """Extrae los campos que identifican un registro."""
+    return {nombre: (origen.get(nombre) or "") for nombre in spec["clave"]}
+
+
 @app.route("/admin")
 def admin():
-    """Estado de los casos frente a los mínimos que exige el enunciado."""
+    """Tablero del módulo administrativo: avance de los casos y qué se cambió."""
     try:
         estado = api("/api/admin/estado")
         error = None
@@ -743,9 +1117,188 @@ def admin():
     return render_template(
         "admin.html",
         estado=estado,
+        historial=api_opcional("/api/admin/historial", None),
+        esquema=api_opcional("/api/admin/esquema", {}),
         investigaciones=resumen_de_investigaciones(),
         error=error,
     )
+
+
+@app.route("/admin/casos", methods=["POST"])
+def crear_caso():
+    """Da de alta un caso con su propio módulo de Prolog."""
+    cuerpo = {
+        "id": (request.form.get("id") or "").strip(),
+        "titulo": (request.form.get("titulo") or "").strip(),
+        "descripcion": (request.form.get("descripcion") or "").strip(),
+        "dificultad": (request.form.get("dificultad") or "media").strip(),
+    }
+    try:
+        creado = api("/api/admin/casos", metodo="POST", json=cuerpo)
+    except ErrorBackend as exc:
+        flash(f"No se pudo crear el caso. {exc}", "error")
+        return redirect(url_for("admin"))
+    flash(
+        f"Caso «{creado['titulo']}» creado. Ya usa las reglas de inferencia "
+        "compartidas: cargale personas, lugares y hechos y la investigación "
+        "empieza a deducir sobre él.",
+        "exito",
+    )
+    return redirect(url_for("administrar_caso", caso_id=creado["id"]))
+
+
+@app.route("/admin/casos/<caso_id>")
+def administrar_caso(caso_id: str):
+    """Editor de un caso: sus ocho entidades en una sola pantalla.
+
+    `?editar=entidad:clave` abre una fila como formulario, sin JavaScript.
+    """
+    try:
+        caso = api(f"/api/admin/casos/{caso_id}")
+    except ErrorBackend as exc:
+        if exc.codigo == 404:
+            abort(404)
+        flash(str(exc), "error")
+        return redirect(url_for("admin"))
+
+    datos = {
+        entidad: api_opcional(ruta_entidad(caso_id, entidad), [])
+        for entidad in ENTIDADES
+    }
+    for entidad, filas in datos.items():
+        desarmar_para_el_formulario(entidad, filas)
+    esquema = api_opcional("/api/admin/esquema", {})
+    # Lo que depende del caso y no del esquema: así los desplegables solo
+    # ofrecen personas, lugares y evidencias que existen.
+    esquema["personas"] = [p["nombre"] for p in datos["personas"]]
+    esquema["lugares"] = [lugar["nombre"] for lugar in datos["lugares"]]
+    esquema["evidencias"] = [e["id"] for e in datos["evidencias"]]
+
+    editar_entidad, _, editar_clave = (request.args.get("editar") or "").partition(":")
+    return render_template(
+        "admin_caso.html",
+        caso=caso,
+        entidades=ENTIDADES,
+        datos=datos,
+        esquema=esquema,
+        editar_entidad=editar_entidad,
+        editar_clave=editar_clave,
+    )
+
+
+@app.route("/admin/casos/<caso_id>/ficha", methods=["POST"])
+def editar_ficha(caso_id: str):
+    """Cambia la ficha del caso y los tres hechos que lo configuran."""
+    try:
+        api(
+            f"/api/admin/casos/{caso_id}",
+            metodo="PUT",
+            json={
+                "titulo": (request.form.get("titulo") or "").strip(),
+                "descripcion": (request.form.get("descripcion") or "").strip(),
+                "dificultad": (request.form.get("dificultad") or "media").strip(),
+            },
+        )
+        escena = (request.form.get("escena") or "").strip()
+        hora = (request.form.get("hora_incidente") or "").strip()
+        api(
+            f"/api/admin/casos/{caso_id}/ficha",
+            metodo="PUT",
+            json={
+                "escena": escena or None,
+                "hora_incidente": int(hora) if hora.isdigit() else None,
+                "medios_requeridos": request.form.getlist("medios_requeridos"),
+            },
+        )
+    except ErrorBackend as exc:
+        flash(f"No se pudo guardar la ficha. {exc}", "error")
+    else:
+        flash("Ficha del caso actualizada.", "exito")
+    return redirect(url_for("administrar_caso", caso_id=caso_id))
+
+
+@app.route("/admin/casos/<caso_id>/eliminar", methods=["POST"])
+def eliminar_caso(caso_id: str):
+    try:
+        resultado = api(f"/api/admin/casos/{caso_id}", metodo="DELETE")
+    except ErrorBackend as exc:
+        flash(f"No se pudo eliminar el caso. {exc}", "error")
+    else:
+        aclaracion = (
+            "Se borró con todos sus hechos."
+            if resultado.get("definitivo")
+            else "Salió del catálogo; sus hechos siguen intactos y «restaurar» lo devuelve."
+        )
+        flash(f"Caso {caso_id} eliminado. {aclaracion}", "exito")
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/casos/<caso_id>/<entidad>/crear", methods=["POST"])
+def crear_registro(caso_id: str, entidad: str):
+    spec = entidad_valida(entidad)
+    try:
+        api(
+            ruta_entidad(caso_id, entidad),
+            metodo="POST",
+            json=cuerpo_de_formulario(spec, request.form, editar=False),
+        )
+    except ErrorBackend as exc:
+        flash(f"No se pudo agregar {spec['singular']}. {exc}", "error")
+    else:
+        flash(f"Se agregó {spec['singular']}.", "exito")
+    return redirect(url_for("administrar_caso", caso_id=caso_id, _anchor=entidad))
+
+
+@app.route("/admin/casos/<caso_id>/<entidad>/editar", methods=["POST"])
+def editar_registro(caso_id: str, entidad: str):
+    spec = entidad_valida(entidad)
+    clave = clave_desde(spec, request.form)
+    try:
+        api(
+            ruta_entidad(caso_id, entidad, clave),
+            metodo="PUT",
+            json=cuerpo_de_formulario(spec, request.form, editar=True),
+        )
+    except ErrorBackend as exc:
+        flash(f"No se pudo modificar {spec['singular']}. {exc}", "error")
+    else:
+        flash(f"Se modificó {spec['singular']}.", "exito")
+    return redirect(url_for("administrar_caso", caso_id=caso_id, _anchor=entidad))
+
+
+@app.route("/admin/casos/<caso_id>/<entidad>/eliminar", methods=["POST"])
+def eliminar_registro(caso_id: str, entidad: str):
+    spec = entidad_valida(entidad)
+    clave = clave_desde(spec, request.form)
+    try:
+        resultado = api(ruta_entidad(caso_id, entidad, clave), metodo="DELETE")
+    except ErrorBackend as exc:
+        flash(f"No se pudo eliminar {spec['singular']}. {exc}", "error")
+    else:
+        cascada = resultado.get("en_cascada") or {}
+        arrastre = ", ".join(f"{cuantos} {que}" for que, cuantos in cascada.items())
+        flash(
+            f"Se eliminó {spec['singular']}."
+            + (f" También se quitaron: {arrastre}." if arrastre else ""),
+            "exito",
+        )
+    return redirect(url_for("administrar_caso", caso_id=caso_id, _anchor=entidad))
+
+
+@app.route("/admin/restaurar", methods=["POST"])
+def restaurar_administracion():
+    """Deshace todos los cambios administrativos."""
+    try:
+        resultado = api("/api/admin/restaurar", metodo="POST")
+    except ErrorBackend as exc:
+        flash(f"No se pudo restaurar. {exc}", "error")
+    else:
+        flash(
+            f"Se deshicieron {resultado['operaciones_deshechas']} operaciones. "
+            "Los casos volvieron a su estado de fábrica.",
+            "exito",
+        )
+    return redirect(url_for("admin"))
 
 
 @app.route("/salud")

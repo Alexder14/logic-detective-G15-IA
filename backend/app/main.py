@@ -14,16 +14,20 @@ Documentación interactiva: http://localhost:8000/docs
 
 from __future__ import annotations
 
-import re
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from .administracion import administracion
+from .admin_api import router as router_admin
+from .comun import atomo, casos_de_ejemplo, consultar, exigir_caso
 from .investigaciones import COSTO_PISTA, Investigacion, almacen
-from .prolog_engine import ErrorConsulta, MotorNoDisponible, motor
+from .prolog_engine import motor
+from .terminos import ValorInvalido
 
 
 # --------------------------------------------------------------------------
@@ -33,8 +37,21 @@ from .prolog_engine import ErrorConsulta, MotorNoDisponible, motor
 
 @asynccontextmanager
 async def ciclo_de_vida(app: FastAPI):
-    """Carga la base de conocimiento una sola vez, al arrancar."""
+    """Carga la base de conocimiento y reaplica los cambios administrativos.
+
+    El motor arranca desde los `.pl` de fábrica, así que sin ese segundo paso un
+    reinicio perdería lo que el administrador registró. Si falla, la API levanta
+    igual: un archivo de datos corrupto no debe dejar el sistema sin arrancar.
+    """
     motor.iniciar()
+    if motor.disponible:
+        try:
+            administracion.aplicar_al_motor()
+            app.state.error_administracion = None
+        except Exception as exc:  # pragma: no cover - depende del estado en disco
+            app.state.error_administracion = f"{type(exc).__name__}: {exc}"
+    else:
+        app.state.error_administracion = None
     yield
 
 
@@ -55,61 +72,24 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(ValorInvalido)
+async def valor_invalido(peticion: Request, exc: ValorInvalido) -> JSONResponse:
+    """Traduce un valor que no cumple el esquema a un 400 con el campo culpable."""
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc), "campo": exc.campo, "motivo": exc.detalle},
+    )
+
+
+app.include_router(router_admin)
+
+
 # --------------------------------------------------------------------------
 # Utilidades
 #
-# Los endpoints son `async def` para que todas las llamadas a Prolog caigan en
-# el hilo del bucle de eventos. Ver la nota en prolog_engine.py.
+# `consultar`, `atomo`, `exigir_caso` y `casos_de_ejemplo` viven en comun.py:
+# los comparten estos endpoints y los del módulo administrativo.
 # --------------------------------------------------------------------------
-
-
-def consultar(meta: str) -> list[dict[str, Any]]:
-    """Ejecuta una meta y traduce los fallos del motor a errores HTTP."""
-    try:
-        return motor.filas(meta)
-    except MotorNoDisponible as exc:
-        raise HTTPException(
-            status_code=503, detail=f"Motor Prolog no disponible: {exc}"
-        )
-    except ErrorConsulta as exc:
-        raise HTTPException(status_code=500, detail=f"Error en la consulta: {exc}")
-
-
-#: Un átomo de Prolog sin comillas: minúscula inicial, letras, dígitos y _.
-ATOMO = re.compile(r"^[a-z][a-zA-Z0-9_]{0,63}$")
-
-
-def atomo(valor: str, campo: str) -> str:
-    """Valida que el valor sea un átomo de Prolog antes de interpolarlo.
-
-    Las metas se arman concatenando texto, así que sin esto un parámetro como
-    `caso1), halt, foo(` se ejecutaría como código Prolog. Todo lo que venga
-    del cliente y termine dentro de una meta pasa por acá.
-    """
-    if not ATOMO.match(valor):
-        raise HTTPException(
-            status_code=400,
-            detail=f"'{campo}' debe ser un identificador válido (recibido: {valor!r})",
-        )
-    return valor
-
-
-def exigir_caso(caso_id: str) -> str:
-    """Valida el identificador y da 404 si el caso no está en caso_modulo/1."""
-    caso = atomo(caso_id, "caso_id")
-    if not consultar(f"caso_modulo({caso})"):
-        raise HTTPException(status_code=404, detail=f"El caso '{caso}' no existe")
-    return caso
-
-
-def casos_de_ejemplo() -> set[str]:
-    """Casos de referencia, que no cuentan entre los tres entregables.
-
-    No tienen que alcanzar los mínimos, así que `estado_caso/3` los reporta
-    incompletos. La interfaz necesita saberlo para no presentarlos como trabajo
-    a medio hacer en el módulo administrativo.
-    """
-    return {fila["M"] for fila in consultar("api_caso_de_ejemplo(M)")}
 
 
 def exigir_investigacion(caso_id: str, investigacion_id: str) -> Investigacion:

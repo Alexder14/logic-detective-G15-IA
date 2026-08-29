@@ -3,6 +3,12 @@
 {% block contenido %}
 
 <h1>Módulo administrativo</h1>
+<p class="proposito">
+  Acá se edita la base de conocimiento que consulta el motor: casos, personas,
+  evidencias, lugares, declaraciones, relaciones, coartadas, motivos y
+  oportunidades. Cada cambio se guarda y la investigación lo ve en la consulta
+  siguiente.
+</p>
 
 {% if estado %}
   <p>
@@ -15,7 +21,7 @@
     {% endif %}
   </p>
 
-  <h2>Avance de los casos</h2>
+  <h2>Casos</h2>
   <p>
     <small>
       Mínimos por caso según el enunciado:
@@ -27,32 +33,42 @@
     </small>
   </p>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Caso</th><th>Estado</th>
-        <th>Sosp.</th><th>Evid.</th><th>Lug.</th><th>Decl.</th><th>Reglas</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for caso in estado.casos %}
+  <div class="tabla-scroll">
+    <table>
+      <thead>
         <tr>
-          <td>{{ caso.titulo }}<br><small><code>prolog/{{ caso.id }}.pl</code></small></td>
-          <td>
-            <span class="etiqueta {{ caso.estado }}">{{ caso.estado }}</span>
-            {% if caso.es_ejemplo %}
-              <span class="etiqueta ejemplo">ejemplo</span>
-            {% endif %}
-          </td>
-          <td>{{ caso.conteos.sospechosos }}/{{ estado.minimos_por_caso.sospechosos }}</td>
-          <td>{{ caso.conteos.evidencias }}/{{ estado.minimos_por_caso.evidencias }}</td>
-          <td>{{ caso.conteos.lugares }}/{{ estado.minimos_por_caso.lugares }}</td>
-          <td>{{ caso.conteos.declaraciones }}/{{ estado.minimos_por_caso.declaraciones }}</td>
-          <td>{{ caso.conteos.reglas_de_inferencia }}/{{ estado.minimos_por_caso.reglas_de_inferencia }}</td>
+          <th>Caso</th><th>Estado</th>
+          <th>Sosp.</th><th>Evid.</th><th>Lug.</th><th>Decl.</th><th>Reglas</th>
+          <th>Acciones</th>
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {% for caso in estado.casos %}
+          <tr>
+            <td>{{ caso.titulo }}<br><small><code>prolog/{{ caso.id }}.pl</code></small></td>
+            <td>
+              <span class="etiqueta {{ caso.estado }}">{{ caso.estado }}</span>
+              {% if caso.es_ejemplo %}
+                <span class="etiqueta ejemplo">ejemplo</span>
+              {% endif %}
+            </td>
+            <td>{{ caso.conteos.sospechosos }}/{{ estado.minimos_por_caso.sospechosos }}</td>
+            <td>{{ caso.conteos.evidencias }}/{{ estado.minimos_por_caso.evidencias }}</td>
+            <td>{{ caso.conteos.lugares }}/{{ estado.minimos_por_caso.lugares }}</td>
+            <td>{{ caso.conteos.declaraciones }}/{{ estado.minimos_por_caso.declaraciones }}</td>
+            <td>{{ caso.conteos.reglas_de_inferencia }}/{{ estado.minimos_por_caso.reglas_de_inferencia }}</td>
+            <td class="acciones-fila">
+              <a href="{{ url_for('administrar_caso', caso_id=caso.id) }}">Administrar</a>
+              <form method="post" class="en-linea"
+                    action="{{ url_for('eliminar_caso', caso_id=caso.id) }}">
+                <button type="submit" class="peligro">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 
   {% if estado.casos | selectattr('es_ejemplo') | list %}
     <p class="nota">
@@ -62,6 +78,99 @@
       propósito.
     </p>
   {% endif %}
+
+  <section class="panel-admin">
+    <details class="alta">
+      <summary>Crear un caso</summary>
+      <p class="detalle-entidad">
+        El caso nace con su propio módulo de Prolog, que incluye las reglas
+        compartidas de <code>reglas_base.pl</code>: apenas tenga personas y
+        hechos, el motor empieza a deducir sobre él. Lo que no hereda son
+        reglas propias, y por eso va a figurar como incompleto hasta que
+        alguien se las escriba en un <code>.pl</code>.
+      </p>
+      <form method="post" action="{{ url_for('crear_caso') }}">
+        <div class="rejilla-campos">
+          <div>
+            <label for="caso-id">Identificador</label>
+            <input type="text" id="caso-id" name="id" required
+                   placeholder="caso4">
+            <small class="nota">minúsculas, dígitos y guion bajo</small>
+          </div>
+          <div>
+            <label for="caso-titulo">Título</label>
+            <input type="text" id="caso-titulo" name="titulo" required>
+          </div>
+          <div>
+            <label for="caso-dificultad">Dificultad</label>
+            <select id="caso-dificultad" name="dificultad">
+              {% for opcion in esquema.get('dificultades', ['facil', 'media', 'dificil']) %}
+                <option value="{{ opcion }}" {% if opcion == 'media' %}selected{% endif %}>
+                  {{ opcion | nombre }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <label for="caso-descripcion">Descripción del incidente</label>
+        <textarea id="caso-descripcion" name="descripcion" rows="3" required></textarea>
+        <button type="submit">Crear el caso</button>
+      </form>
+    </details>
+  </section>
+{% endif %}
+
+{% if historial %}
+  <section class="panel-admin">
+    <h2>Cambios administrativos <span class="chip-n">{{ historial.cambios }}</span></h2>
+    <p class="detalle-entidad">
+      El motor arranca siempre desde los <code>.pl</code> de fábrica y encima
+      se vuelve a aplicar esta bitácora, así que los cambios sobreviven a un
+      reinicio del contenedor. Como cada baja guarda lo que se llevó, la
+      bitácora se puede recorrer al revés: eso es el botón de restaurar.
+    </p>
+
+    {% if historial.operaciones %}
+      <div class="tabla-scroll">
+        <table>
+          <thead>
+            <tr><th>Caso</th><th>Operación</th><th>Hecho</th></tr>
+          </thead>
+          <tbody>
+            {% for operacion in historial.operaciones %}
+              <tr>
+                <td><code>{{ operacion.modulo }}</code></td>
+                <td>
+                  <span class="etiqueta {{ 'valida' if operacion.tipo == 'alta' else 'invalida' }}">
+                    {{ operacion.tipo }}
+                  </span>
+                </td>
+                <td>
+                  <code>{{ operacion.termino }}</code>
+                  {% if operacion.removidos %}
+                    <br><small class="nota">
+                      se llevó: {{ operacion.removidos | join(' · ') }}
+                    </small>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <form method="post" action="{{ url_for('restaurar_administracion') }}">
+        <button type="submit" class="peligro">
+          Restaurar los {{ historial.cambios }} cambios y volver al estado de fábrica
+        </button>
+      </form>
+    {% else %}
+      <p class="vacio">
+        No hay cambios administrativos: los casos están tal como salieron de
+        sus archivos <code>.pl</code>.
+      </p>
+    {% endif %}
+  </section>
 {% endif %}
 
 <h2>Investigaciones de esta sesión</h2>
